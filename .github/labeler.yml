@@ -1,0 +1,81 @@
+# Path-based labels for actions/labeler@v5.
+# Each top-level key is a label; the value lists path globs that trigger it.
+
+area/webhook:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/routes/webhook.js
+          - src/services/jiraService.js
+
+area/api:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/routes/api.js
+
+area/openwebui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/services/openwebuiService.js
+          - src/routes/openwebuiDummy.js
+
+area/workflow:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/services/workflowService.js
+          - src/services/markdownService.js
+
+area/database:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/db/**
+
+area/socket:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/services/socketService.js
+
+area/debug:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/routes/debug.js
+          - src/services/debugState.js
+
+area/config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/config.js
+          - src/constants.js
+          - .env.example
+
+area/frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - public/**
+
+area/docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - Dockerfile
+          - docker-compose.yml
+          - .dockerignore
+
+area/ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/workflows/**
+          - .github/labeler.yml
+          - .github/dependabot.yml
+          - .github/scripts/**
+
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - Praesentation.md
+          - README.md
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - package.json
+          - package-lock.json

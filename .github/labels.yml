@@ -1,0 +1,106 @@
+# Zentrale Label-Definition für das Repo. Wird per labels-sync workflow
+# auf GitHub angewendet. Farben sind hex ohne #.
+
+# --- Bereiche (area/*) ---
+- name: area/webhook
+  color: 1d76db
+  description: Jira-Webhook-Eingang und -Verarbeitung
+- name: area/api
+  color: 1d76db
+  description: HTTP-API für UI / Clients
+- name: area/openwebui
+  color: 1d76db
+  description: Open-WebUI-Integration (real & dummy)
+- name: area/workflow
+  color: 1d76db
+  description: Markdown-Generierung und Ticket-Workflow
+- name: area/database
+  color: 1d76db
+  description: SQLite-Schema und -Queries
+- name: area/socket
+  color: 1d76db
+  description: Socket.IO / Live-Updates
+- name: area/debug
+  color: 1d76db
+  description: Debug-Routen und Debug-State
+- name: area/config
+  color: 1d76db
+  description: Konfiguration, Konstanten, .env
+- name: area/frontend
+  color: 1d76db
+  description: Statische Web-UI (public/)
+- name: area/docker
+  color: 1d76db
+  description: Dockerfile, docker-compose
+- name: area/ci
+  color: 1d76db
+  description: GitHub Actions, Workflows, Scripts
+- name: area/docs
+  color: 1d76db
+  description: README, Praesentation, Markdown
+
+# --- Typen (type/*) ---
+- name: type/feature
+  color: 0e8a16
+  description: Neues Feature
+- name: type/bug
+  color: d73a4a
+  description: Bugfix
+- name: type/docs
+  color: 0075ca
+  description: Nur Dokumentation
+- name: type/chore
+  color: cccccc
+  description: Wartung / Aufräumen
+- name: type/refactor
+  color: fbca04
+  description: Refactor ohne Verhaltensänderung
+- name: type/test
+  color: c2e0c6
+  description: Tests
+- name: type/performance
+  color: f9d0c4
+  description: Performance
+- name: type/ci
+  color: cccccc
+  description: CI / Build / Tooling
+- name: type/build
+  color: cccccc
+  description: Build-System
+- name: type/style
+  color: cccccc
+  description: Formatierung / Style
+- name: type/revert
+  color: e99695
+  description: Revert eines vorherigen Commits
+
+# --- Größe (size/*) ---
+- name: size/XS
+  color: 3cbf00
+  description: <= 10 Zeilen
+- name: size/S
+  color: 5fc011
+  description: <= 100 Zeilen
+- name: size/M
+  color: c2e02e
+  description: <= 500 Zeilen
+- name: size/L
+  color: f1c40f
+  description: <= 1000 Zeilen
+- name: size/XL
+  color: e67e22
+  description: > 1000 Zeilen, bitte aufteilen
+
+# --- Status / Sonstiges ---
+- name: dependencies
+  color: 0366d6
+  description: Dependency-Updates
+- name: breaking-change
+  color: b60205
+  description: Bricht bestehende Schnittstellen
+- name: needs-review
+  color: fbca04
+  description: Wartet auf Review
+- name: do-not-merge
+  color: b60205
+  description: Nicht mergen

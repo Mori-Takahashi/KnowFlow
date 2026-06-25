@@ -1,0 +1,51 @@
+name: PR Dependency Report
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-deps-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  outdated:
+    name: Comment outdated dependencies
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Collect npm outdated as JSON
+        id: outdated
+        run: |
+          # npm outdated exitet mit 1, wenn etwas outdated ist - das ist hier kein Fehler.
+          npm outdated --json > outdated.json || true
+          echo "size=$(wc -c < outdated.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Collect npm audit summary
+        id: audit
+        run: |
+          npm audit --json > audit.json || true
+
+      - name: Build Markdown report
+        run: node .github/scripts/render-deps-report.js outdated.json audit.json > deps-report.md
+
+      - name: Upsert PR comment
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          header: deps-report
+          path: deps-report.md

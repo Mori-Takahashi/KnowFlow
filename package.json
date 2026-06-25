@@ -1,0 +1,44 @@
+{
+  "name": "knowflow",
+  "version": "1.1.0",
+  "description": "KnowFlow: Jira webhook -> Markdown -> Open WebUI knowledge base, with live dashboard and MCP connections",
+  "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mori-Takahashi/KnowFlow.git"
+  },
+  "homepage": "https://github.com/Mori-Takahashi/KnowFlow#readme",
+  "bugs": {
+    "url": "https://github.com/Mori-Takahashi/KnowFlow/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "jira",
+    "webhook",
+    "openwebui",
+    "knowledge-base"
+  ],
+  "author": "Mori-Takahashi",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "axios": "^1.18.0",
+    "better-sqlite3": "^12.11.1",
+    "cookie-parser": "^1.4.7",
+    "debug": "^4.3.7",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "form-data": "^4.0.6",
+    "socket.io": "^4.8.1",
+    "uuid": "^14.0.0",
+    "zod": "^3.25.76"
+  }
+}

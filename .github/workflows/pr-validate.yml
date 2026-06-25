@@ -1,0 +1,159 @@
+name: PR Validate
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-validate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  install:
+    name: Install & Audit
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm audit (production deps)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
+  syntax:
+    name: Syntax Check
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: node --check on every src file
+        run: |
+          set -e
+          fail=0
+          while IFS= read -r f; do
+            if ! node --check "$f"; then
+              echo "::error file=$f::Syntax error"
+              fail=1
+            fi
+          done < <(find src -type f -name '*.js')
+          exit $fail
+
+  env-consistency:
+    name: .env.example Consistency
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Check that every process.env.* is documented in .env.example
+        run: node .github/scripts/check-env-consistency.js
+
+  secret-scan:
+    name: Secret Leak Scan
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Scan diff for obvious secrets
+        run: node .github/scripts/check-secret-leak.js "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: knowflow:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  oss-readiness:
+    name: OSS Readiness
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check required OSS files
+        run: node .github/scripts/check-oss-readiness.js
+
+  boot-smoke:
+    name: Boot Smoke Test
+    runs-on: ubuntu-latest
+    needs: [install]
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Start app with minimal env and check it listens
+        env:
+          PORT: 3000
+          DATABASE_URL: ./data/knowflow.sqlite
+          JIRA_BASE_URL: https://example.atlassian.net
+          JIRA_EMAIL: ci@example.com
+          JIRA_API_TOKEN: dummy-token
+          JIRA_PROJECT_KEYS: TEST
+          OPENWEBUI_MODE: dummy
+          # Required at boot to encrypt secrets in the settings store; without it
+          # loadConfig() aborts before the server can listen.
+          SETTINGS_ENCRYPTION_KEY: ci-smoke-test-key-1234567890
+        run: |
+          mkdir -p data
+          node src/index.js &
+          PID=$!
+          # Wait up to 15s for the port to open
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:3000/ > /dev/null; then
+              echo "App is listening."
+              kill $PID || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::App did not start within 15s"
+          kill $PID || true
+          exit 1

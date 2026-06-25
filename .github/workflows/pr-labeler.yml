@@ -1,0 +1,91 @@
+name: PR Labeler
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  path-labels:
+    name: Label by changed paths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v6
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+          sync-labels: true
+
+  size-label:
+    name: Label by PR size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: codelytv/pr-size-labeler@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          xs_label: 'size/XS'
+          xs_max_size: '10'
+          s_label: 'size/S'
+          s_max_size: '100'
+          m_label: 'size/M'
+          m_max_size: '500'
+          l_label: 'size/L'
+          l_max_size: '1000'
+          xl_label: 'size/XL'
+          fail_if_xl: 'false'
+          message_if_xl: >
+            Dieser PR ist sehr groß (>1000 geänderte Zeilen). Bitte überlege,
+            ihn in mehrere kleinere PRs aufzuteilen, damit das Review handhabbar bleibt.
+          files_to_ignore: |
+            package-lock.json
+
+  type-label:
+    name: Label by Conventional Commit type
+    runs-on: ubuntu-latest
+    steps:
+      - name: Derive label from PR title
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const title = context.payload.pull_request.title || '';
+            const map = {
+              feat:     'type/feature',
+              fix:      'type/bug',
+              docs:     'type/docs',
+              chore:    'type/chore',
+              refactor: 'type/refactor',
+              test:     'type/test',
+              perf:     'type/performance',
+              ci:       'type/ci',
+              build:    'type/build',
+              style:    'type/style',
+              revert:   'type/revert',
+            };
+            const match = title.match(/^(\w+)(\([^)]+\))?!?:/);
+            if (!match) {
+              core.info(`PR title "${title}" does not match conventional commits, skipping type label`);
+              return;
+            }
+            const label = map[match[1].toLowerCase()];
+            if (!label) {
+              core.info(`No mapping for type ${match[1]}`);
+              return;
+            }
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: [label],
+            });
+            // Breaking change indicator (!)
+            if (match[0].includes('!')) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['breaking-change'],
+              });
+            }

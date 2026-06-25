@@ -1,0 +1,17 @@
+# Default owner für alles im Repo
+*                            @mori-takahashi
+
+# CI / Workflows / PR-Automation
+/.github/                    @mori-takahashi
+
+# Kern-Services
+/src/services/               @mori-takahashi
+/src/routes/webhook.js       @mori-takahashi
+/src/config.js               @mori-takahashi
+
+# Datenbank-Layer (Schema-Änderungen brauchen Review)
+/src/db/                     @mori-takahashi
+
+# Docker / Deployment
+Dockerfile                   @mori-takahashi
+docker-compose.yml           @mori-takahashi

@@ -1,0 +1,43 @@
+name: PR Title Lint
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  conventional-title:
+    name: Conventional Commit Title
+    runs-on: ubuntu-latest
+    # Dependabot-PRs haben bereits valide Conventional-Commit-Titel
+    # (z. B. "chore(deps): ..."). Zudem kann der Dependabot-GITHUB_TOKEN
+    # nicht auf die nötigen Ressourcen zugreifen ("Resource not accessible
+    # by integration"), daher den Lint hier überspringen.
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            chore
+            refactor
+            test
+            perf
+            ci
+            build
+            style
+            revert
+          requireScope: false
+          subjectPattern: ^[A-ZÄÖÜa-zäöü0-9].+$
+          subjectPatternError: |
+            Der PR-Titel muss nach dem Typ mit einem Buchstaben oder einer Zahl beginnen.
+            Beispiele:
+              feat(webhook): Jira-Signatur prüfen
+              fix(db): SQLite-Pfad bei relativem DATABASE_URL korrekt auflösen
+          wip: true
