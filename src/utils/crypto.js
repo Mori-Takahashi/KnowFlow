@@ -50,7 +50,7 @@ function hasEncryptionKey() {
  */
 function encrypt(plain) {
   if (plain == null || plain === '') return '';
-  log('encrypt called with length=%d', String(plain).length);
+  log('encrypt called');
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv(ALGORITHM, getKey(), iv);
   const enc = Buffer.concat([cipher.update(String(plain), 'utf8'), cipher.final()]);
