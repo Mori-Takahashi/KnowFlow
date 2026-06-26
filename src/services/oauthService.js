@@ -94,7 +94,7 @@ function issueClientId(redirectUris) {
  * @returns {{ru: string[]}|null} -> The client record, or null when invalid.
  */
 function parseClientId(clientId) {
-  if (!clientId || !clientId.startsWith('kfc_')) return null;
+  if (typeof clientId !== 'string' || !clientId.startsWith('kfc_')) return null;
   const payload = decode(clientId.slice(4));
   return payload && payload.t === 'client' ? payload : null;
 }
