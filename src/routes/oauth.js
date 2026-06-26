@@ -53,6 +53,8 @@ function createOAuthRouter({ config, authService }) {
 
   // Throttle password guessing against the OAuth login (password submission).
   const authorizeLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
+  // Throttle open registration and token exchange endpoints.
+  const oauthLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
 
   /**
    * Applies permissive CORS headers used on the JSON discovery/token endpoints.
@@ -128,7 +130,7 @@ function createOAuthRouter({ config, authService }) {
 
   router.options('/oauth/register', (_req, res) => { cors(res); res.status(204).end(); });
 
-  router.post('/oauth/register', (req, res) => {
+  router.post('/oauth/register', oauthLimiter, (req, res) => {
     log('POST /oauth/register');
     cors(res);
     const body = req.body || {};
@@ -222,7 +224,7 @@ function createOAuthRouter({ config, authService }) {
     return { ok: true, conn, client };
   }
 
-  router.get('/oauth/authorize', (req, res) => {
+  router.get('/oauth/authorize', oauthLimiter, (req, res) => {
     log('GET /oauth/authorize');
     const p = req.query || {};
     const check = validateAuthParams(p);
@@ -270,7 +272,7 @@ function createOAuthRouter({ config, authService }) {
 
   router.options('/oauth/token', (_req, res) => { cors(res); res.status(204).end(); });
 
-  router.post('/oauth/token', (req, res) => {
+  router.post('/oauth/token', oauthLimiter, (req, res) => {
     log('POST /oauth/token %o', { grant: req.body?.grant_type });
     cors(res);
     res.set('Cache-Control', 'no-store');
