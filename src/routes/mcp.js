@@ -7,6 +7,7 @@ const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/ser
 
 const queries = require('../db/queries');
 const oauthService = require('../services/oauthService');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 const log = debug('knowflow:routes:mcp');
 
@@ -26,7 +27,7 @@ const JSONRPC_UNAUTHORIZED = -32001;
  */
 function presentedToken(req) {
   const header = req.get('authorization') || '';
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  const match = /^Bearer\s+(\S+)/i.exec(header.trim());
   if (match) return match[1].trim();
   return (req.get('x-mcp-token') || '').trim();
 }
@@ -71,7 +72,9 @@ function createMcpRouter({ mcpService, settingsService, config }) {
   const router = express.Router();
   const baseUrl = String(config?.publicBaseUrl || '').replace(/\/$/, '');
 
-  router.post('/:slug', async (req, res) => {
+  const mcpLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 60 });
+
+  router.post('/:slug', mcpLimiter, async (req, res) => {
     log('POST /mcp/:slug %o', { slug: req.params.slug });
     const conn = queries.getMcpConnection(req.params.slug);
     if (!conn) {
