@@ -19,7 +19,7 @@ const log = debug('knowflow:utils:mask');
  * maskSecret('abcdef1234567890', 4, 4); // -> 'abcd...7890'
  */
 function maskSecret(value, head = 4, tail = 4) {
-  log('maskSecret called with length=%d', value ? value.length : 0);
+  log('maskSecret called');
   if (!value) return '';
   const str = String(value);
   if (str.length <= head + tail) {
