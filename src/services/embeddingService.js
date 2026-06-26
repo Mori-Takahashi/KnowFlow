@@ -8,6 +8,7 @@ const settingsService = require('./settingsService');
 const socketService = require('./socketService');
 const {
   RAG_MODE,
+  DEFAULT_LOCAL_EMBED_MODEL,
   EMBEDDING_STATUS,
   EMBEDDING_MAX_CHARS,
   HTTP_TIMEOUT_MS,
@@ -18,6 +19,11 @@ const log = debug('knowflow:embeddingService');
 // OpenAI embeddings endpoint. Ollama's endpoint is built from the configured
 // base URL since it usually runs locally.
 const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
+
+// Lazily-instantiated Transformers.js pipeline for the in-process local
+// provider. Loading a model is expensive (download on first use + init), so the
+// extractor is cached and only rebuilt when the configured model changes.
+let localExtractor = { model: null, pipe: null };
 
 // Tracks the background reindex run so the admin dashboard can show progress.
 // A single global run is enough: there is only one embedding model at a time.
@@ -150,6 +156,58 @@ async function embedViaOpenAi(cfg, text) {
 }
 
 /**
+ * Resolves the effective local model name, falling back to the bundled default
+ * when the admin left the field empty.
+ *
+ * @param {Object} cfg -> RAG config.
+ * @returns {string} -> A non-empty model id.
+ */
+function localModelName(cfg) {
+  return cfg.model || DEFAULT_LOCAL_EMBED_MODEL;
+}
+
+/**
+ * Returns a cached Transformers.js feature-extraction pipeline for the given
+ * model, building (and downloading) it on first use. Rebuilds when the model
+ * changes so a model switch in the dashboard takes effect.
+ *
+ * @param {string} modelName -> Hugging Face model id (e.g. 'Xenova/...').
+ * @returns {Promise<Function>} -> The extractor pipeline.
+ */
+async function getLocalExtractor(modelName) {
+  if (localExtractor.pipe && localExtractor.model === modelName) {
+    return localExtractor.pipe;
+  }
+  // @huggingface/transformers is ESM-only; load it via dynamic import so it
+  // works from this CommonJS module.
+  const { pipeline } = await import('@huggingface/transformers');
+  const pipe = await pipeline('feature-extraction', modelName);
+  localExtractor = { model: modelName, pipe };
+  return pipe;
+}
+
+/**
+ * Embeds text in-process with Transformers.js (ONNX runtime). Needs no external
+ * service and no GPU, which makes it the middle ground between cloud embeddings
+ * (OpenAI) and a dedicated local server (Ollama). The model is downloaded and
+ * cached on first use, so the first call after a (re)start is slower.
+ *
+ * @param {Object} cfg -> RAG config.
+ * @param {string} text -> Prepared input text.
+ * @returns {Promise<Float32Array>} -> The embedding vector.
+ * @throws {Error} -> When the model yields an empty vector.
+ */
+async function embedViaLocal(cfg, text) {
+  const extractor = await getLocalExtractor(localModelName(cfg));
+  const out = await extractor(text, { pooling: 'mean', normalize: true });
+  const vec = Float32Array.from(out.data);
+  if (vec.length === 0) {
+    throw new Error('Lokales Embedding-Modell lieferte keinen Vektor.');
+  }
+  return vec;
+}
+
+/**
  * Embeds arbitrary text with the currently configured provider/model.
  *
  * @param {string} text -> Input text.
@@ -159,11 +217,18 @@ async function embedViaOpenAi(cfg, text) {
 async function embed(text) {
   const cfg = settingsService.getRagConfig();
   if (cfg.mode === RAG_MODE.OFF) throw new Error('RAG ist deaktiviert.');
-  if (!cfg.model) throw new Error('Kein Embedding-Modell konfiguriert.');
+  if (cfg.mode !== RAG_MODE.LOCAL && !cfg.model) {
+    throw new Error('Kein Embedding-Modell konfiguriert.');
+  }
   const prepared = prepareText(text);
-  const vector = cfg.mode === RAG_MODE.OLLAMA
-    ? await embedViaOllama(cfg, prepared)
-    : await embedViaOpenAi(cfg, prepared);
+  let vector;
+  if (cfg.mode === RAG_MODE.OLLAMA) {
+    vector = await embedViaOllama(cfg, prepared);
+  } else if (cfg.mode === RAG_MODE.OPENAI) {
+    vector = await embedViaOpenAi(cfg, prepared);
+  } else {
+    vector = await embedViaLocal(cfg, prepared);
+  }
   return { vector, model: modelTag(cfg), dim: vector.length };
 }
 

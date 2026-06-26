@@ -9,6 +9,25 @@ Das Format orientiert sich an
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-26
+
+### Added
+
+- **Lokaler Embedding-Provider (semantische Suche ohne externen Dienst)**: Neuer
+  RAG-Modus **„Lokal (im Server)"**, der Embeddings direkt im KnowFlow-Prozess
+  per [Transformers.js](https://github.com/huggingface/transformers.js) (ONNX
+  Runtime) berechnet — kein Python, kein zweiter Dienst und keine GPU
+  erforderlich. Damit schließt sich die Lücke zwischen der reinen Stichwortsuche
+  (`off`), Cloud-Embeddings (`openai`) und einem dedizierten lokalen Server
+  (`ollama`): das „Zwischending" für mittelstarke Server. Das Modell
+  (Standard `Xenova/multilingual-e5-small`, mehrsprachig inkl. Deutsch) wird beim
+  ersten Einsatz einmalig heruntergeladen und zwischengespeichert; die Pipeline
+  bleibt im Speicher und wird nur bei einem Modellwechsel neu geladen. Im Admin-Tab
+  **RAG** als eigener Modus auswählbar, inklusive frei wählbarem Modellnamen. Wie
+  bei jedem Provider-Wechsel werden bestehende Vektoren über den Modell-Tag
+  invalidiert — nach dem Umschalten einmal **„Alle neu indizieren"** ausführen.
+  Neuer netzwerkfreier Test-Block für den Embedding-Service (`npm test`).
+
 ## [1.1.0] - 2026-06-24
 
 ## What's Changed

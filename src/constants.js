@@ -178,7 +178,16 @@ const RAG_MODE = Object.freeze({
   OFF: 'off',
   OLLAMA: 'ollama',
   OPENAI: 'openai',
+  LOCAL: 'local',
 });
+
+/**
+ * Default model for the in-process local embedding provider (Transformers.js).
+ * A small, multilingual sentence-transformers model that covers German and
+ * English ticket text and runs comfortably on CPU. Used when the admin selects
+ * the `local` mode without naming an explicit model.
+ */
+const DEFAULT_LOCAL_EMBED_MODEL = 'Xenova/multilingual-e5-small';
 
 /**
  * Per-ticket embedding status stored in tickets.embedding_status.
@@ -361,6 +370,7 @@ module.exports = {
   TOKEN_EXPIRY_REMINDER_DAYS,
   OPENWEBUI_MODE,
   RAG_MODE,
+  DEFAULT_LOCAL_EMBED_MODEL,
   EMBEDDING_STATUS,
   DEFAULT_RAG_CONFIG,
   EMBEDDING_MAX_CHARS,
