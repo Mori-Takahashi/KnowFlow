@@ -32,6 +32,7 @@ const { createDebugRouter } = require('./routes/debug');
 const { createOpenWebUiDummyRouter } = require('./routes/openwebuiDummy');
 const { maskSecret } = require('./utils/mask');
 const { securityHeaders } = require('./middleware/securityHeaders');
+const { csrfProtection } = require('./middleware/csrf');
 const { MCP_CONNECTION_SEEDS } = require('./constants');
 
 const log = debug('knowflow:index');
@@ -124,6 +125,7 @@ async function main() {
   app.set('trust proxy', 1);
   app.use(securityHeaders());
   app.use(cookieParser());
+  app.use(csrfProtection());
   // Capture the raw body so the GitHub webhook handler can verify the HMAC
   // signature (X-Hub-Signature-256) over the exact bytes Express received.
   app.use(express.json({ limit: '5mb', verify: (req, _res, buf) => { req.rawBody = buf; } }));

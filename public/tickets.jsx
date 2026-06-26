@@ -102,7 +102,7 @@ function Drawer({ ticket, onClose, onRetry }) {
     if (confirmText && !window.confirm(confirmText)) return;
     setLcMsg(null);
     try {
-      const resp = await fetch("/api/admin/tickets/" + encodeURIComponent(id) + "/" + action, { method: "POST" });
+      const resp = await fetch("/api/admin/tickets/" + encodeURIComponent(id) + "/" + action, { method: "POST", headers: { "x-csrf-token": window.getCsrfToken ? window.getCsrfToken() : "" } });
       if (resp.status === 401) {
         setLcMsg({ kind: "err", text: "Bitte zuerst im Tab Einstellungen anmelden." });
         return;

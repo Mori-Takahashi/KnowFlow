@@ -4,9 +4,14 @@
 
 // --- kleine API-Helfer (Cookies werden bei same-origin automatisch gesendet) ---
 function adminApi(method, path, body) {
+  const headers = {};
+  if (body) headers["Content-Type"] = "application/json";
+  if (method !== "GET" && method !== "HEAD") {
+    headers["x-csrf-token"] = window.getCsrfToken ? window.getCsrfToken() : "";
+  }
   return fetch("/api/admin" + path, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined,
   }).then(async (r) => {
     const data = await r.json().catch(() => ({}));

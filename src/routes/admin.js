@@ -38,6 +38,9 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
 
   // Throttle password guessing against the dashboard login.
   const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
+  // Throttle destructive danger-zone operations (defence-in-depth; routes also
+  // require admin session + danger-zone password).
+  const dangerLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10 });
 
   /**
    * Builds a guard that admits admins unconditionally and users only when the
@@ -692,7 +695,7 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
     res.json({ ok: true, enabled });
   });
 
-  router.post('/danger/clear-events', requireAdmin, (req, res) => {
+  router.post('/danger/clear-events', requireAdmin, dangerLimiter, (req, res) => {
     log('POST /danger/clear-events');
     if (!requireDangerPassword(req, res)) return;
     const deleted = queries.deleteAllEvents();
@@ -705,7 +708,7 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
     res.json({ ok: true, deleted });
   });
 
-  router.post('/danger/wipe-tickets', requireAdmin, async (req, res) => {
+  router.post('/danger/wipe-tickets', requireAdmin, dangerLimiter, async (req, res) => {
     log('POST /danger/wipe-tickets');
     if (!requireDangerPassword(req, res)) return;
     try {
@@ -717,7 +720,7 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
     }
   });
 
-  router.post('/danger/reset-config', requireAdmin, (req, res) => {
+  router.post('/danger/reset-config', requireAdmin, dangerLimiter, (req, res) => {
     log('POST /danger/reset-config');
     if (!requireDangerPassword(req, res)) return;
     settingsService.resetRuntimeConfig();
@@ -730,7 +733,7 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
     res.json({ ok: true });
   });
 
-  router.post('/danger/shutdown', requireAdmin, (req, res) => {
+  router.post('/danger/shutdown', requireAdmin, dangerLimiter, (req, res) => {
     log('POST /danger/shutdown');
     if (!requireDangerPassword(req, res)) return;
     recordEvent({

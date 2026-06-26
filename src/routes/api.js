@@ -6,6 +6,7 @@ const debug = require('debug');
 const queries = require('../db/queries');
 const debugState = require('../services/debugState');
 const { TICKETS_PER_PAGE, TICKET_STATUS, TICKET_LIFECYCLE, HEALTH_CACHE_TTL_MS } = require('../constants');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 const log = debug('knowflow:routes:api');
 
@@ -123,6 +124,8 @@ function applyHealthOverrides(payload) {
 function createApiRouter({ workflowService, jiraService, openwebuiService, settingsService, authService, attachmentService, mcpService, versionService, config }) {
   log('createApiRouter called');
   const router = express.Router();
+
+  const apiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 120 });
 
   /**
    * Resolves the session role from the request cookie.
@@ -345,7 +348,7 @@ function createApiRouter({ workflowService, jiraService, openwebuiService, setti
     }
   });
 
-  router.get('/attachments/:jiraId/:attachmentId', (req, res) => {
+  router.get('/attachments/:jiraId/:attachmentId', apiLimiter, (req, res) => {
     log('GET /api/attachments/:jiraId/:attachmentId %o', { jiraId: req.params.jiraId, attachmentId: req.params.attachmentId });
     try {
       const row = queries.getTicketAttachment(req.params.jiraId, req.params.attachmentId);

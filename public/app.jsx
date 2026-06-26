@@ -121,7 +121,7 @@ function App() {
   else view = <Logs />;
 
   const onLogout = () => {
-    fetch("/api/admin/logout", { method: "POST" })
+    fetch("/api/admin/logout", { method: "POST", headers: { "x-csrf-token": window.getCsrfToken ? window.getCsrfToken() : "" } })
       .catch(() => {})
       .then(() => loadAccess())
       .then(() => { if (window.KNOWFLOW_FULL_RELOAD) window.KNOWFLOW_FULL_RELOAD(); });
