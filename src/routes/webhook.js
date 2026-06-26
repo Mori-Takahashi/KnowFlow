@@ -5,6 +5,7 @@ const express = require('express');
 const debug = require('debug');
 
 const { maskSecret, maskInBody } = require('../utils/mask');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 const log = debug('knowflow:routes:webhook');
 
@@ -233,6 +234,8 @@ function createWebhookRouter({ workflowService, settingsService, versionService,
   log('createWebhookRouter called');
   const router = express.Router();
 
+  const webhookLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 100 });
+
   // GitHub webhook for the update check. Accepts release + push events and (when
   // a secret is configured) verifies the X-Hub-Signature-256 HMAC. Without a
   // secret it accepts the request (same PoC posture as the Jira webhook above).
@@ -273,7 +276,7 @@ function createWebhookRouter({ workflowService, settingsService, versionService,
     res.status(202).json({ ok: true, ignored: true });
   });
 
-  router.post('/jira', (req, res) => {
+  router.post('/jira', webhookLimiter, (req, res) => {
     log('POST /webhook/jira received');
 
     const payload = req.body || {};
