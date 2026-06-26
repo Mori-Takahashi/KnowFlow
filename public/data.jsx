@@ -6,6 +6,16 @@
 //   - Notifying React via window.dispatchEvent('knowflow:data-changed') so a
 //     top-level effect in app.jsx can force a re-render.
 
+// Read the double-submit CSRF token from the kf-csrf cookie.
+window.getCsrfToken = function getCsrfToken() {
+  try {
+    const m = document.cookie.match(/(?:^|;\s*)kf-csrf=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  } catch (_) {
+    return '';
+  }
+};
+
 (function () {
   // Initial empty state so components that render before the first fetch do not
   // throw on undefined access.
@@ -151,14 +161,14 @@
   // POST helpers for retry + manual sync.
   window.KNOWFLOW_RETRY_TICKET = async function (jiraId) {
     try {
-      await fetch('/api/tickets/' + encodeURIComponent(jiraId) + '/retry', { method: 'POST' });
+      await fetch('/api/tickets/' + encodeURIComponent(jiraId) + '/retry', { method: 'POST', headers: { 'x-csrf-token': window.getCsrfToken() } });
     } catch (err) {
       console.warn('Retry fehlgeschlagen:', err.message);
     }
   };
   window.KNOWFLOW_MANUAL_SYNC = async function () {
     try {
-      await fetch('/api/sync', { method: 'POST' });
+      await fetch('/api/sync', { method: 'POST', headers: { 'x-csrf-token': window.getCsrfToken() } });
     } catch (err) {
       console.warn('Sync fehlgeschlagen:', err.message);
     }
@@ -190,7 +200,7 @@
     try {
       await fetch('/api/debug/simulate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': window.getCsrfToken() },
         body: JSON.stringify(opts || {}),
       });
     } catch (err) {
@@ -203,7 +213,7 @@
     try {
       const resp = await fetch('/api/debug/health-override', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': window.getCsrfToken() },
         body: JSON.stringify({ service, status }),
       });
       if (resp.ok) {
@@ -218,7 +228,7 @@
   // Clear all debug health overrides.
   window.KNOWFLOW_DEBUG_RESET = async function () {
     try {
-      await fetch('/api/debug/reset', { method: 'POST' });
+      await fetch('/api/debug/reset', { method: 'POST', headers: { 'x-csrf-token': window.getCsrfToken() } });
       if (window.KNOWFLOW_DEBUG_STATE) window.KNOWFLOW_DEBUG_STATE.healthOverrides = {};
     } catch (err) {
       console.warn('Debug-Reset fehlgeschlagen:', err.message);
