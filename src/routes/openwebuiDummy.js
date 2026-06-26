@@ -10,6 +10,8 @@ const queries = require('../db/queries');
 
 const log = debug('knowflow:routes:openwebuiDummy');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Writes the dummy file's markdown content to disk so the dummy mode behaves
  * consistently whether files are created in-process or via HTTP.
@@ -63,6 +65,9 @@ function createOpenWebUiDummyRouter(dummyStorageDir) {
 
   router.post('/api/v1/files/:id/data/content/update', (req, res) => {
     log('POST dummy /api/v1/files/:id/data/content/update %o', { id: req.params.id });
+    if (!UUID_RE.test(req.params.id)) {
+      return res.status(400).json({ error: 'Ungültige Datei-ID' });
+    }
     try {
       const content = (req.body && req.body.content) || '';
       const ok = queries.updateDummyFileContent(req.params.id, content);
@@ -92,6 +97,9 @@ function createOpenWebUiDummyRouter(dummyStorageDir) {
 
   router.get('/api/v1/files/:id', (req, res) => {
     log('GET dummy /api/v1/files/:id %o', { id: req.params.id });
+    if (!UUID_RE.test(req.params.id)) {
+      return res.status(400).json({ error: 'Ungültige Datei-ID' });
+    }
     const row = queries.getDummyFile(req.params.id);
     if (!row) return res.status(404).json({ error: 'Datei nicht gefunden' });
     res.json({
