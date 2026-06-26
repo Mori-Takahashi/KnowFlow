@@ -1,6 +1,6 @@
 {
   "name": "knowflow",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "KnowFlow: Jira webhook -> Markdown -> Open WebUI knowledge base, with live dashboard and MCP connections",
   "main": "src/index.js",
   "repository": {
