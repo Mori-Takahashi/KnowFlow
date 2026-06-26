@@ -354,6 +354,9 @@ function AdminRag({ config, reloadConfig }) {
     setMsg(null);
     try {
       const body = { mode, ollamaUrl, model };
+      // Local mode reuses the model field; fall back to the bundled default so
+      // the stored model tag matches what the server actually embeds with.
+      if (mode === "local" && !model.trim()) body.model = "Xenova/multilingual-e5-small";
       if (openaiApiKey) body.openaiApiKey = openaiApiKey;
       await adminApi("PUT", "/config/rag", body);
       setOpenaiApiKey("");
@@ -388,8 +391,9 @@ function AdminRag({ config, reloadConfig }) {
 
   const MODES = [
     { id: "off", label: "Aus (nur Stichwort)" },
-    { id: "ollama", label: "Ollama (lokal)" },
+    { id: "local", label: "Lokal (im Server)" },
     { id: "openai", label: "OpenAI" },
+    { id: "ollama", label: "Ollama (lokal)" },
   ];
   const prog = status && status.progress;
   const pct = prog && prog.total > 0 ? Math.round(((prog.done + prog.failed) / prog.total) * 100) : 0;
@@ -416,6 +420,16 @@ function AdminRag({ config, reloadConfig }) {
             ))}
           </div>
 
+          {mode === "local" && (
+            <>
+              <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 0 }}>
+                Embeddings werden direkt im KnowFlow-Server berechnet (Transformers.js) — kein
+                externer Dienst und keine GPU nötig. Ideal für mittelstarke Server. Das Modell wird
+                beim ersten Einsatz einmalig heruntergeladen und zwischengespeichert.
+              </p>
+              <Field label="Modell" value={model} onChange={setModel} placeholder="Xenova/multilingual-e5-small" />
+            </>
+          )}
           {mode === "ollama" && (
             <>
               <Field label="Ollama URL" value={ollamaUrl} onChange={setOllamaUrl} placeholder="http://localhost:11434" />
