@@ -9,6 +9,25 @@ Das Format orientiert sich an
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-06-27
+
+### Security
+
+- **CWE-306 — Fehlende Authentifizierung an `/openwebui-dummy`-Endpunkten behoben
+  (GHSA-5677-gpw3-5f8f)**: Die drei schreibenden Dummy-Endpunkte
+  (`POST /openwebui-dummy/api/v1/files/`,
+  `POST /openwebui-dummy/api/v1/files/:id/data/content/update`,
+  `POST /openwebui-dummy/api/v1/knowledge/:knowledgeId/file/add`) wurden bisher
+  unbedingt gemountet und waren ohne Authentifizierung erreichbar. Ein Angreifer
+  konnte mit einem gültigen CSRF-Token (öffentlich abrufbar) beliebige Datenbankzeilen
+  einfügen, Dateiinhalte überschreiben und den `in_knowledge`-Status beliebiger
+  Einträge setzen — ohne gültige Session.
+  Der Router wird ab sofort **nur noch im Dummy-Modus gemountet** und ist zusätzlich
+  durch das `requireSession`-Middleware geschützt: unauthentifizierte Anfragen
+  erhalten `401`. Instanzen, die im `real`-Modus betrieben werden, sind vollständig
+  abgeschirmt, da der Router dort gar nicht registriert wird. Gemeldet von [frosch1q](https://github.com/frosch1q) und 
+  [Lyonel Berzen](https://github.com/Mori-Takahashi) (2026-06-27).
+
 ## [1.3.0] - 2026-06-26
 
 ### Added
