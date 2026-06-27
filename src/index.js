@@ -33,7 +33,8 @@ const { createOpenWebUiDummyRouter } = require('./routes/openwebuiDummy');
 const { maskSecret } = require('./utils/mask');
 const { securityHeaders } = require('./middleware/securityHeaders');
 const { csrfProtection } = require('./middleware/csrf');
-const { MCP_CONNECTION_SEEDS } = require('./constants');
+const { requireSession } = require('./middleware/auth');
+const { MCP_CONNECTION_SEEDS, OPENWEBUI_MODE } = require('./constants');
 
 const log = debug('knowflow:index');
 
@@ -181,7 +182,9 @@ async function main() {
     console.warn('[index] UI_DEBUG aktiv: Debug-Endpunkte unter /api/debug/* verfügbar.');
   }
 
-  app.use('/openwebui-dummy', createOpenWebUiDummyRouter(config.dummyStorageDir));
+  if (settingsService.getOpenWebUiMode() === OPENWEBUI_MODE.DUMMY) {
+    app.use('/openwebui-dummy', requireSession, createOpenWebUiDummyRouter(config.dummyStorageDir));
+  }
 
   const publicDir = path.resolve(process.cwd(), 'public');
   app.use(express.static(publicDir, { extensions: ['html'] }));
