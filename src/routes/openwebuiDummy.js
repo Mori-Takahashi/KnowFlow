@@ -16,14 +16,27 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * Writes the dummy file's markdown content to disk so the dummy mode behaves
  * consistently whether files are created in-process or via HTTP.
  *
+ * The `uuid` may originate from a request parameter, so it is validated against
+ * the strict UUID format here (not only at the call site) to keep it from
+ * escaping `dummyDir` via path traversal. As a defense in depth, the resolved
+ * target path is also checked to stay within `dummyDir`.
+ *
  * @param {string} dummyDir -> Absolute directory.
  * @param {string} uuid -> File UUID.
  * @param {string} content -> Markdown content.
  * @returns {void}
  */
 function writeToDisk(dummyDir, uuid, content) {
-  if (!fs.existsSync(dummyDir)) fs.mkdirSync(dummyDir, { recursive: true });
-  fs.writeFileSync(path.join(dummyDir, `${uuid}.md`), content, 'utf8');
+  if (!UUID_RE.test(uuid)) {
+    throw new Error('Ungültige Datei-ID');
+  }
+  const resolvedDir = path.resolve(dummyDir);
+  const target = path.join(resolvedDir, `${uuid}.md`);
+  if (target !== path.join(resolvedDir, path.basename(target))) {
+    throw new Error('Ungültiger Dateipfad');
+  }
+  if (!fs.existsSync(resolvedDir)) fs.mkdirSync(resolvedDir, { recursive: true });
+  fs.writeFileSync(target, content, 'utf8');
 }
 
 /**
