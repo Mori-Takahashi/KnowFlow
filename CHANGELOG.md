@@ -9,6 +9,27 @@ Das Format orientiert sich an
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-06-29
+
+### Security
+
+- **CWE-770 — Fehlendes Rate-Limiting an den OAuth-Discovery-Endpunkten behoben**:
+  Die öffentlichen Metadaten-Endpunkte (`/.well-known/oauth-protected-resource`,
+  `/.well-known/oauth-protected-resource/mcp/:slug` und
+  `/.well-known/oauth-authorization-server`) waren — anders als die übrigen
+  `/oauth/*`-Endpunkte — ungedrosselt und konnten beliebig oft abgefragt werden.
+  Sie sind jetzt durch einen großzügig bemessenen Rate-Limiter (120 Anfragen pro
+  Minute und IP) abgesichert, der legitime Mehrfach-Probes erlaubt, ein Fluten
+  aber verhindert. Von CodeQL gemeldet (`js/missing-rate-limiting`).
+
+- **CWE-22 — Path-Injection beim Schreiben der Dummy-Dateien gehärtet**: Die
+  Hilfsfunktion `writeToDisk` in `src/routes/openwebuiDummy.js` baute den
+  Dateipfad aus einer ID, die in einem Aufrufer aus einem Request-Parameter
+  stammte. Die UUID-Format-Prüfung wird nun direkt in `writeToDisk` als
+  Schutzbarriere durchgeführt (nicht nur an der Aufrufstelle), und der aufgelöste
+  Zielpfad wird zusätzlich darauf geprüft, das Zielverzeichnis nicht zu verlassen
+  (Defense in Depth). Von CodeQL gemeldet (`js/path-injection`).
+
 ## [1.3.1] - 2026-06-27
 
 ### Security

@@ -55,6 +55,10 @@ function createOAuthRouter({ config, authService }) {
   const authorizeLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
   // Throttle open registration and token exchange endpoints.
   const oauthLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
+  // Throttle the public, cacheable discovery/metadata endpoints. Generous limit
+  // since legitimate clients may probe several variants, but still bounded so an
+  // attacker cannot flood them.
+  const discoveryLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 120 });
 
   /**
    * Applies permissive CORS headers used on the JSON discovery/token endpoints.
@@ -108,20 +112,20 @@ function createOAuthRouter({ config, authService }) {
 
   router.options('/.well-known/{*path}', (_req, res) => { cors(res); res.status(204).end(); });
 
-  router.get('/.well-known/oauth-protected-resource/mcp/:slug', (req, res) => {
+  router.get('/.well-known/oauth-protected-resource/mcp/:slug', discoveryLimiter, (req, res) => {
     log('GET protected-resource-metadata %o', { slug: req.params.slug });
     cors(res);
     res.json(protectedResourceMetadata(req.params.slug));
   });
 
-  router.get('/.well-known/oauth-protected-resource', (_req, res) => {
+  router.get('/.well-known/oauth-protected-resource', discoveryLimiter, (_req, res) => {
     cors(res);
     res.json(protectedResourceMetadata(null));
   });
 
   // Some clients append the resource path to the AS metadata probe; serve the
   // same document on both the bare and path-suffixed variants.
-  router.get(['/.well-known/oauth-authorization-server', '/.well-known/oauth-authorization-server/{*path}'], (_req, res) => {
+  router.get(['/.well-known/oauth-authorization-server', '/.well-known/oauth-authorization-server/{*path}'], discoveryLimiter, (_req, res) => {
     cors(res);
     res.json(authServerMetadata());
   });
