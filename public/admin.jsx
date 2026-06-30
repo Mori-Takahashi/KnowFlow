@@ -333,6 +333,11 @@ function AdminRag({ config, reloadConfig }) {
   const [ollamaUrl, setOllamaUrl] = React.useState(r.ollamaUrl || "http://localhost:11434");
   const [model, setModel] = React.useState(r.model || "");
   const [openaiApiKey, setOpenaiApiKey] = React.useState("");
+  const [targetId, setTargetId] = React.useState(r.targetId || "");
+  const [targets, setTargets] = React.useState([]);
+  const [owModels, setOwModels] = React.useState([]);
+  const [scanMsg, setScanMsg] = React.useState(null);
+  const [scanning, setScanning] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const [testMsg, setTestMsg] = React.useState(null);
   const [status, setStatus] = React.useState(null);
@@ -342,6 +347,32 @@ function AdminRag({ config, reloadConfig }) {
   }, []);
 
   React.useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  // The Open WebUI mode reuses an existing knowledge-target connection; load the
+  // list so the admin can pick which one to embed against.
+  React.useEffect(() => {
+    adminApi("GET", "/targets").then((res) => setTargets(res.targets || [])).catch(() => {});
+  }, []);
+
+  const scanModels = async () => {
+    if (!targetId) {
+      setScanMsg({ kind: "err", text: "Bitte zuerst eine Open-WebUI-Verbindung wählen." });
+      return;
+    }
+    setScanning(true);
+    setScanMsg({ kind: "info", text: "Prüfe Key & lade Modelle..." });
+    try {
+      const res = await adminApi("POST", "/config/rag/openwebui/models", { targetId });
+      const models = res.models || [];
+      setOwModels(models);
+      setScanMsg({ kind: "ok", text: `${models.length} Modell(e) gefunden. Bitte ein für Embeddings geeignetes Modell wählen.` });
+    } catch (err) {
+      setOwModels([]);
+      setScanMsg({ kind: "err", text: err.message });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   // While a reindex runs, poll the status so the progress bar advances live.
   React.useEffect(() => {
@@ -357,6 +388,9 @@ function AdminRag({ config, reloadConfig }) {
       // Local mode reuses the model field; fall back to the bundled default so
       // the stored model tag matches what the server actually embeds with.
       if (mode === "local" && !model.trim()) body.model = "Xenova/multilingual-e5-small";
+      // Open WebUI mode reuses an existing connection (URL + token live in the
+      // target); only the chosen connection id and model need to be persisted.
+      if (mode === "openwebui") body.targetId = targetId;
       if (openaiApiKey) body.openaiApiKey = openaiApiKey;
       await adminApi("PUT", "/config/rag", body);
       setOpenaiApiKey("");
@@ -394,6 +428,7 @@ function AdminRag({ config, reloadConfig }) {
     { id: "local", label: "Lokal (im Server)" },
     { id: "openai", label: "OpenAI" },
     { id: "ollama", label: "Ollama (lokal)" },
+    { id: "openwebui", label: "Open WebUI" },
   ];
   const prog = status && status.progress;
   const pct = prog && prog.total > 0 ? Math.round(((prog.done + prog.failed) / prog.total) * 100) : 0;
@@ -446,6 +481,60 @@ function AdminRag({ config, reloadConfig }) {
                 onChange={setOpenaiApiKey}
                 placeholder={r.hasOpenaiApiKey ? "•••••••• gespeichert" : "sk-..."}
               />
+            </>
+          )}
+          {mode === "openwebui" && (
+            <>
+              <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 0 }}>
+                Nutzt eine bereits eingerichtete Open-WebUI-Verbindung (URL + Key) für die
+                Embeddings — kein zusätzlicher Anbieter nötig. Wähle die Verbindung, prüfe den
+                Key und wähle anschließend ein passendes Embedding-Modell.
+              </p>
+              {scanMsg && <Banner kind={scanMsg.kind}>{scanMsg.text}</Banner>}
+              {targets.length === 0 ? (
+                <Banner kind="info">
+                  Es ist noch keine Open-WebUI-Verbindung hinterlegt. Lege zuerst im Tab
+                  <b> Wissensbasen</b> eine Verbindung an.
+                </Banner>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <div className="k" style={{ marginBottom: 6 }}>Open-WebUI-Verbindung</div>
+                    <select
+                      value={targetId}
+                      disabled={!canEdit}
+                      onChange={(e) => { setTargetId(e.target.value); setOwModels([]); setScanMsg(null); }}
+                      style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}
+                    >
+                      <option value="">— Verbindung wählen —</option>
+                      {targets.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}{t.url ? ` (${t.url})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button className="btn-ghost" style={{ padding: "5px 10px", marginBottom: 12 }} onClick={scanModels} disabled={!canEdit || !targetId || scanning}>
+                    <i className="bi bi-search"></i>{scanning ? "Lädt..." : "Key prüfen & Modelle laden"}
+                  </button>
+                  {owModels.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div className="k" style={{ marginBottom: 6 }}>Embedding-Modell</div>
+                      <select
+                        value={model}
+                        disabled={!canEdit}
+                        onChange={(e) => setModel(e.target.value)}
+                        style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}
+                      >
+                        <option value="">— Modell wählen —</option>
+                        {owModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.label}{m.embeddingCapable ? " — für Embeddings geeignet" : " — vermutlich ungeeignet"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
             </>
           )}
           {mode !== "off" && (
