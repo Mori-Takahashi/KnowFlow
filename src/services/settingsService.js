@@ -428,6 +428,7 @@ function getRagConfig() {
       : DEFAULT_RAG_CONFIG.ollamaUrl,
     model: typeof raw.model === 'string' ? raw.model.trim() : DEFAULT_RAG_CONFIG.model,
     dim: Number.isFinite(raw.dim) ? raw.dim : DEFAULT_RAG_CONFIG.dim,
+    targetId: typeof raw.targetId === 'string' ? raw.targetId : DEFAULT_RAG_CONFIG.targetId,
     openaiApiKey: raw.openaiApiKey ? decrypt(raw.openaiApiKey) : '',
   };
 }
@@ -453,6 +454,7 @@ function setRagConfig(input) {
       : (current.ollamaUrl || DEFAULT_RAG_CONFIG.ollamaUrl),
     model: input.model != null ? String(input.model).trim() : (current.model || ''),
     dim: Number.isFinite(input.dim) ? input.dim : (current.dim || 0),
+    targetId: input.targetId != null ? String(input.targetId).trim() : (current.targetId || ''),
     openaiApiKey: current.openaiApiKey || '',
   };
   if (input.openaiApiKey) next.openaiApiKey = encrypt(input.openaiApiKey);

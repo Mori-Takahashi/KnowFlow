@@ -178,6 +178,7 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
           ollamaUrl: r.ollamaUrl,
           model: r.model,
           dim: r.dim,
+          targetId: r.targetId,
           hasOpenaiApiKey: Boolean(r.openaiApiKey),
           openaiApiKeyMasked: r.openaiApiKey ? maskSecret(r.openaiApiKey) : '',
         };
@@ -237,6 +238,21 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
   router.get('/config/rag/status', requireView, (_req, res) => {
     log('GET /config/rag/status');
     res.json(embeddingService.getStatus());
+  });
+
+  router.post('/config/rag/openwebui/models', requireView, async (req, res) => {
+    log('POST /config/rag/openwebui/models');
+    const target = settingsService.getTarget(req.body?.targetId);
+    if (!target) {
+      res.status(404).json({ error: 'Open-WebUI-Verbindung nicht gefunden' });
+      return;
+    }
+    try {
+      const models = await openwebuiService.listModels(target);
+      res.json({ models });
+    } catch (err) {
+      res.status(502).json({ error: `Modelle konnten nicht geladen werden: ${err.message}` });
+    }
   });
 
   router.post('/config/rag/reindex', requireEdit, (_req, res) => {
