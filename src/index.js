@@ -3,12 +3,15 @@
 require('dotenv').config();
 
 const http = require('http');
+const crypto = require('crypto');
 const path = require('path');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const debug = require('debug');
 
 const { loadConfig } = require('./config');
+const { upsertEnv } = require('./utils/envFile');
+const setupPinService = require('./services/setupPinService');
 const { openDatabase } = require('./db');
 const settingsService = require('./services/settingsService');
 const authService = require('./services/authService');
@@ -76,6 +79,47 @@ function printBootSummary(config) {
 }
 
 /**
+ * Ensures the infrastructure secrets exist before any config is loaded. On a
+ * truly fresh checkout there may be no .env at all; rather than crashing in
+ * loadConfig(), we generate a strong SETTINGS_ENCRYPTION_KEY (and SESSION_SECRET
+ * when absent), inject them into process.env, and persist them to a .env file so
+ * subsequent boots are stable. This is what lets the app start with no .env and
+ * fall through to the browser setup wizard.
+ *
+ * @returns {void}
+ */
+function ensureBootSecrets() {
+  const generated = {};
+  if (!process.env.SETTINGS_ENCRYPTION_KEY) {
+    const key = crypto.randomBytes(32).toString('hex');
+    process.env.SETTINGS_ENCRYPTION_KEY = key;
+    generated.SETTINGS_ENCRYPTION_KEY = key;
+  }
+  if (!process.env.SESSION_SECRET) {
+    const secret = crypto.randomBytes(32).toString('hex');
+    process.env.SESSION_SECRET = secret;
+    generated.SESSION_SECRET = secret;
+  }
+  if (Object.keys(generated).length === 0) return;
+
+  try {
+    const written = upsertEnv(generated);
+    console.warn(
+      `[index] Keine Secrets gefunden — automatisch generiert und in .env gespeichert (${written.join(', ')}). ` +
+        'Bitte die .env sichern: Bei Verlust von SETTINGS_ENCRYPTION_KEY sind verschlüsselte Tokens nicht mehr lesbar.',
+    );
+  } catch (err) {
+    // Writing the .env can fail on a read-only filesystem (e.g. some PaaS). The
+    // secrets still live in process.env for this run, but they will rotate on
+    // every restart, so warn loudly instead of crashing.
+    console.warn(
+      `[index] Secrets generiert, aber .env konnte nicht geschrieben werden (${err.message}). ` +
+        'SETTINGS_ENCRYPTION_KEY/SESSION_SECRET sollten dauerhaft in der Umgebung gesetzt werden.',
+    );
+  }
+}
+
+/**
  * Bootstraps the KnowFlow HTTP server, services, database, and Socket.IO.
  *
  * @returns {Promise<void>} -> Resolves once the server is listening.
@@ -83,6 +127,8 @@ function printBootSummary(config) {
  */
 async function main() {
   log('main called');
+
+  ensureBootSecrets();
 
   const config = loadConfig();
   openDatabase(config.databasePath);
@@ -100,7 +146,19 @@ async function main() {
     settingsService.setSetupCompleted();
   }
 
+  // First-run only: when the setup wizard is still pending, generate a one-shot
+  // console PIN that gates the wizard. It rotates on every restart until setup
+  // completes, so only someone with access to the server console can run it.
+  const setupRequired = !settingsService.isSetupCompleted() && !settingsService.getAuthConfig();
+  if (setupRequired) {
+    setupPinService.generatePin();
+  }
+
   printBootSummary(config);
+
+  if (setupRequired) {
+    setupPinService.printPin(config.publicBaseUrl);
+  }
 
   const jiraService = createJiraService(settingsService);
   const openwebuiService = createOpenWebUiService(settingsService, config.dummyStorageDir);
@@ -173,7 +231,7 @@ async function main() {
   );
 
   // Public first-run setup API (only active until the wizard is completed).
-  app.use('/api/setup', createSetupRouter({ settingsService, authService }));
+  app.use('/api/setup', createSetupRouter({ settingsService, authService, setupPinService, config }));
 
   // Debug controls for live demos. Only mounted when UI_DEBUG=true; when it is
   // off, /api/debug/* returns 404 and the WebUI hides the debug panel.
