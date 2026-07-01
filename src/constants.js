@@ -170,16 +170,37 @@ const ROUTING_OPERATORS = Object.freeze(['equals', 'contains', 'in', 'exists']);
 /**
  * Embedding (RAG) modes for the optional semantic search layer.
  *
- * off    -> no embeddings; search_knowledge stays keyword-only (LIKE)
- * ollama -> embeddings via a local Ollama instance (POST /api/embeddings)
- * openai -> embeddings via the OpenAI embeddings API
+ * off      -> no embeddings; search_knowledge stays keyword-only (LIKE)
+ * ollama   -> embeddings via a local Ollama instance (POST /api/embeddings)
+ * openai   -> embeddings via the OpenAI embeddings API
+ * local    -> embeddings computed in-process via Transformers.js
+ * openwebui-> embeddings via an existing Open WebUI connection (reuses a
+ *             configured knowledge target's URL + token; no extra provider)
  */
 const RAG_MODE = Object.freeze({
   OFF: 'off',
   OLLAMA: 'ollama',
   OPENAI: 'openai',
   LOCAL: 'local',
+  OPENWEBUI: 'openwebui',
 });
+
+/**
+ * Substrings that suggest a model is meant for text embeddings rather than
+ * chat/completion. Used to flag, in the admin UI, which of an Open WebUI
+ * instance's models are suitable for RAG. Heuristic only — Open WebUI does not
+ * expose an authoritative "is embedding model" flag via /api/models.
+ */
+const EMBEDDING_MODEL_HINTS = Object.freeze([
+  'embed',
+  'bge',
+  'e5',
+  'gte',
+  'nomic-embed',
+  'mxbai',
+  'arctic-embed',
+  'text-embedding',
+]);
 
 /**
  * Default model for the in-process local embedding provider (Transformers.js).
@@ -211,6 +232,7 @@ const DEFAULT_RAG_CONFIG = Object.freeze({
   ollamaUrl: 'http://localhost:11434',
   model: '',
   dim: 0,
+  targetId: '',
 });
 
 /**
@@ -399,6 +421,7 @@ module.exports = {
   TOKEN_EXPIRY_REMINDER_DAYS,
   OPENWEBUI_MODE,
   RAG_MODE,
+  EMBEDDING_MODEL_HINTS,
   DEFAULT_LOCAL_EMBED_MODEL,
   EMBEDDING_STATUS,
   DEFAULT_RAG_CONFIG,

@@ -3,8 +3,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { RAG_MODE, DEFAULT_LOCAL_EMBED_MODEL } = require('../src/constants');
+const { RAG_MODE, DEFAULT_LOCAL_EMBED_MODEL, DEFAULT_RAG_CONFIG } = require('../src/constants');
 const embeddingService = require('../src/services/embeddingService');
+const { looksLikeEmbeddingModel } = require('../src/services/openwebuiService');
 
 // These tests cover the network-free parts of the embedding service. The local
 // provider's actual inference is exercised separately (it downloads a model on
@@ -39,4 +40,28 @@ test('cosine returns 0 when a vector has zero magnitude', () => {
   const zero = Float32Array.from([0, 0, 0]);
   const v = Float32Array.from([1, 2, 3]);
   assert.equal(embeddingService.cosine(zero, v), 0);
+});
+
+test('RAG_MODE exposes the Open WebUI provider', () => {
+  assert.equal(RAG_MODE.OPENWEBUI, 'openwebui');
+});
+
+test('DEFAULT_RAG_CONFIG carries an empty Open WebUI targetId', () => {
+  assert.equal(DEFAULT_RAG_CONFIG.targetId, '');
+});
+
+test('looksLikeEmbeddingModel flags embedding models and rejects chat models', () => {
+  for (const name of [
+    'nomic-embed-text',
+    'text-embedding-3-small',
+    'bge-m3',
+    'multilingual-e5-large',
+    'mxbai-embed-large',
+    'snowflake-arctic-embed',
+  ]) {
+    assert.ok(looksLikeEmbeddingModel(name), `${name} should look like an embedding model`);
+  }
+  for (const name of ['llama3', 'mistral', 'gpt-4o', 'qwen2.5', '']) {
+    assert.equal(looksLikeEmbeddingModel(name), false, `${name} should not look like an embedding model`);
+  }
 });

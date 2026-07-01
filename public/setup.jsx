@@ -3,6 +3,10 @@
 // Eigenständiger Vollbild-Assistent, der NUR beim allerersten Start
 // erscheint (gesteuert über /api/setup/status). Bestehende Installationen
 // sehen ihn nie. Bewusst unabhängig von der .shell/Sidebar gehalten.
+//
+// Der Assistent ist PIN-geschützt: Beim ersten Start gibt der Server einen
+// 6-stelligen PIN in der Konsole aus. Dieser muss im ersten Schritt eingegeben
+// werden (POST /api/setup/verify-pin) und schaltet die restlichen Schritte frei.
 // ============================================================
 
 // --- kleine, lokal duplizierte Helfer (setup.jsx soll eigenständig sein) ---
@@ -45,18 +49,27 @@ function SetupErrorBanner({ children }) {
   );
 }
 
-// Die vier inhaltlichen Schritte (0 = Willkommen, 5 = Fertig stehen separat).
-const SETUP_STEPS = ["Passwort", "Jira", "Wissensbasis", "Zusammenfassung"];
+// Die inhaltlichen Schritte (0 = Willkommen, 7 = Fertig stehen separat).
+const SETUP_STEPS = ["PIN", "Passwort", "Jira", "Wissensbasis", "Server", "Zusammenfassung"];
+// Indizes der Schritte für bessere Lesbarkeit.
+const STEP_WELCOME = 0;
+const STEP_PIN = 1;
+const STEP_PASSWORD = 2;
+const STEP_JIRA = 3;
+const STEP_KNOWLEDGE = 4;
+const STEP_SERVER = 5;
+const STEP_SUMMARY = 6;
+const STEP_DONE = 7;
 
 // Die kleinen Schritt-Punkte oben in der Karte (Nummer bzw. Häkchen).
 function SetupDots({ step }) {
-  // Punkte gibt es nur für die inhaltlichen Schritte 1..4; Willkommen (0) und
-  // Erfolg (5) zeigen keine Punktreihe, da dort kein Fortschritt nötig ist.
+  // Punkte gibt es nur für die inhaltlichen Schritte 1..6; Willkommen (0) und
+  // Erfolg (7) zeigen keine Punktreihe, da dort kein Fortschritt nötig ist.
   return (
     <div className="setup-dots">
       {SETUP_STEPS.map((label, i) => {
-        const index = i + 1; // Schritte 1..4
-        const done = step > index || step === 5;
+        const index = i + 1; // Schritte 1..6
+        const done = step > index || step === STEP_DONE;
         const active = step === index;
         const cls = "setup-dot" + (active ? " active" : "") + (done ? " done" : "");
         return (
@@ -74,7 +87,7 @@ function SetupDots({ step }) {
 // Schmaler animierter Fortschrittsbalken (width-Transition in der CSS).
 function SetupProgress({ step }) {
   // 0 % auf der Willkommensseite, danach gleichmäßig bis 100 % im Erfolgsschritt.
-  const pct = Math.max(0, Math.min(100, Math.round((step / 5) * 100)));
+  const pct = Math.max(0, Math.min(100, Math.round((step / STEP_DONE) * 100)));
   return (
     <div className="setup-progress">
       <div className="setup-progress-fill" style={{ width: pct + "%" }}></div>
@@ -86,16 +99,21 @@ function SetupProgress({ step }) {
 // Haupt-Komponente
 // ============================================================
 function SetupWizard({ onComplete }) {
-  // step 0..5: 0 Willkommen, 1 Passwort, 2 Jira, 3 Wissensbasis, 4 Zusammenfassung, 5 Fertig
-  const [step, setStep] = React.useState(0);
+  // step 0..7: 0 Willkommen, 1 PIN, 2 Passwort, 3 Jira, 4 Wissensbasis,
+  // 5 Server, 6 Zusammenfassung, 7 Fertig
+  const [step, setStep] = React.useState(STEP_WELCOME);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState(null);
 
-  // Schritt 1: Admin-Passwort (Pflicht)
+  // Schritt 1: Konsolen-PIN (Pflicht). pinOk merkt sich die erfolgreiche Prüfung.
+  const [pin, setPin] = React.useState("");
+  const [pinOk, setPinOk] = React.useState(false);
+
+  // Schritt 2: Admin-Passwort (Pflicht)
   const [password, setPassword] = React.useState("");
   const [passwordRepeat, setPasswordRepeat] = React.useState("");
 
-  // Schritt 2: Jira (optional)
+  // Schritt 3: Jira (optional)
   const [jiraSkipped, setJiraSkipped] = React.useState(false);
   const [baseUrl, setBaseUrl] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -105,7 +123,7 @@ function SetupWizard({ onComplete }) {
   const [reworkStatuses, setReworkStatuses] = React.useState("Überarbeiten, Updaten");
   const [webhookSecret, setWebhookSecret] = React.useState("");
 
-  // Schritt 3: Wissensbasis (optional)
+  // Schritt 4: Wissensbasis (optional)
   const [targetSkipped, setTargetSkipped] = React.useState(false);
   const [owMode, setOwMode] = React.useState("dummy");
   const [targetName, setTargetName] = React.useState("Standard-Wissensbasis");
@@ -113,36 +131,88 @@ function SetupWizard({ onComplete }) {
   const [targetToken, setTargetToken] = React.useState("");
   const [knowledgeId, setKnowledgeId] = React.useState("");
 
+  // Schritt 5: Server & URLs (optional). Vorbelegt aus /api/setup/status.
+  const [serverSkipped, setServerSkipped] = React.useState(false);
+  const [publicBaseUrl, setPublicBaseUrl] = React.useState("");
+  const [port, setPort] = React.useState("");
+  const [databaseUrl, setDatabaseUrl] = React.useState("");
+  const [webhookDebug, setWebhookDebug] = React.useState(false);
+  const [uiDebug, setUiDebug] = React.useState(false);
+
+  // Aktuelle Infra-Defaults vom Server laden, um den Server-Schritt vorzubefüllen.
+  React.useEffect(() => {
+    fetch("/api/setup/status")
+      .then((r) => r.json())
+      .then((d) => {
+        const env = d && d.envDefaults;
+        if (!env) return;
+        setPublicBaseUrl(env.PUBLIC_BASE_URL || "");
+        setPort(env.PORT || "");
+        setDatabaseUrl(env.DATABASE_URL || "");
+        setWebhookDebug(String(env.WEBHOOK_DEBUG) === "true");
+        setUiDebug(String(env.UI_DEBUG) === "true");
+      })
+      .catch(() => {});
+  }, []);
+
+  // PIN-Validierung: genau 6 Ziffern.
+  const pinValid = /^[0-9]{6}$/.test(pin);
+
   // Passwort-Validierung: beide >= 6 Zeichen und identisch.
   const passwordLongEnough = password.length >= 6;
   const passwordsMatch = password === passwordRepeat;
   const passwordValid = passwordLongEnough && passwordsMatch && passwordRepeat.length >= 6;
 
-  // Hat der Nutzer in Schritt 2 tatsächlich Jira-Werte hinterlegt?
+  // Hat der Nutzer in Schritt 3 tatsächlich Jira-Werte hinterlegt?
   const jiraHasValues = Boolean(baseUrl.trim());
-  // Hat der Nutzer in Schritt 3 echte Wissensbasis-Felder befüllt?
+  // Hat der Nutzer in Schritt 4 echte Wissensbasis-Felder befüllt?
   const targetHasValues = Boolean(targetUrl.trim() || knowledgeId.trim() || targetToken.trim());
 
   // Zurück: ein Schritt, niemals unter 0 und nicht aus dem Erfolgsschritt heraus.
+  // Aus dem PIN-Schritt zurück auf Willkommen ist erlaubt.
   const goBack = () => {
     setError(null);
     setStep((s) => Math.max(0, s - 1));
+  };
+
+  // Prüft den PIN gegen das Backend und schaltet bei Erfolg den nächsten Schritt
+  // frei. Erst danach ist eine Setup-Sitzung aktiv (Cookie), die /complete braucht.
+  const verifyPin = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/setup/verify-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+      setPinOk(true);
+      setStep(STEP_PASSWORD);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   // Weiter aus den optionalen Schritten: trägt der Nutzer doch Werte ein,
   // heben wir ein zuvor gesetztes Skip-Flag wieder auf.
   const goNext = () => {
     setError(null);
-    if (step === 2 && jiraHasValues) setJiraSkipped(false);
-    if (step === 3 && targetHasValues) setTargetSkipped(false);
+    if (step === STEP_JIRA && jiraHasValues) setJiraSkipped(false);
+    if (step === STEP_KNOWLEDGE && targetHasValues) setTargetSkipped(false);
+    if (step === STEP_SERVER) setServerSkipped(false);
     setStep((s) => s + 1);
   };
 
   // Überspringen merkt sich das Flag pro Schritt und springt weiter.
   const skipStep = () => {
     setError(null);
-    if (step === 2) setJiraSkipped(true);
-    if (step === 3) setTargetSkipped(true);
+    if (step === STEP_JIRA) setJiraSkipped(true);
+    if (step === STEP_KNOWLEDGE) setTargetSkipped(true);
+    if (step === STEP_SERVER) setServerSkipped(true);
     setStep((s) => s + 1);
   };
 
@@ -178,6 +248,18 @@ function SetupWizard({ onComplete }) {
         };
       }
 
+      // Server-/Infra-Werte nur senden, wenn der Schritt nicht übersprungen wurde.
+      // Das Backend schreibt sie in die .env (gilt erst nach einem Neustart).
+      if (!serverSkipped) {
+        payload.env = {
+          PUBLIC_BASE_URL: publicBaseUrl,
+          PORT: port,
+          DATABASE_URL: databaseUrl,
+          WEBHOOK_DEBUG: webhookDebug ? "true" : "false",
+          UI_DEBUG: uiDebug ? "true" : "false",
+        };
+      }
+
       const res = await fetch("/api/setup/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -185,7 +267,7 @@ function SetupWizard({ onComplete }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
-      setStep(5);
+      setStep(STEP_DONE);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -196,7 +278,7 @@ function SetupWizard({ onComplete }) {
   // ---- Schritt-Inhalte ----------------------------------------------------
 
   let body;
-  if (step === 0) {
+  if (step === STEP_WELCOME) {
     body = (
       <div className="setup-step setup-step-center" key="welcome">
         <div className="setup-logo">JB</div>
@@ -207,6 +289,10 @@ function SetupWizard({ onComplete }) {
         </p>
         <div className="setup-features">
           <div className="setup-feature">
+            <i className="bi bi-key"></i>
+            <span>Mit PIN aus der Konsole anmelden</span>
+          </div>
+          <div className="setup-feature">
             <i className="bi bi-shield-lock"></i>
             <span>Admin-Passwort festlegen</span>
           </div>
@@ -216,12 +302,31 @@ function SetupWizard({ onComplete }) {
           </div>
           <div className="setup-feature">
             <i className="bi bi-hdd-stack"></i>
-            <span>Wissensbasis wählen</span>
+            <span>Wissensbasis & Server konfigurieren</span>
           </div>
         </div>
       </div>
     );
-  } else if (step === 1) {
+  } else if (step === STEP_PIN) {
+    body = (
+      <div className="setup-step" key="pin">
+        <h2 className="setup-title">Setup-PIN</h2>
+        <p className="setup-lead">
+          Beim Start hat der Server einen 6-stelligen PIN in der Konsole
+          ausgegeben. Gib ihn hier ein, um die Einrichtung freizuschalten.
+        </p>
+        {error && <SetupErrorBanner>{error}</SetupErrorBanner>}
+        <SetupField
+          label="6-stelliger PIN"
+          value={pin}
+          onChange={(v) => setPin(v.replace(/[^0-9]/g, "").slice(0, 6))}
+          placeholder="000000"
+          hint="Steht in der Server-Konsole unter „KNOWFLOW ERSTEINRICHTUNG — SETUP-PIN“."
+          autoFocus
+        />
+      </div>
+    );
+  } else if (step === STEP_PASSWORD) {
     body = (
       <div className="setup-step" key="password">
         <h2 className="setup-title">Admin-Passwort</h2>
@@ -251,7 +356,7 @@ function SetupWizard({ onComplete }) {
         )}
       </div>
     );
-  } else if (step === 2) {
+  } else if (step === STEP_JIRA) {
     body = (
       <div className="setup-step" key="jira">
         <h2 className="setup-title">Jira-Verbindung</h2>
@@ -304,7 +409,7 @@ function SetupWizard({ onComplete }) {
         />
       </div>
     );
-  } else if (step === 3) {
+  } else if (step === STEP_KNOWLEDGE) {
     body = (
       <div className="setup-step" key="knowledge">
         <h2 className="setup-title">Wissensbasis</h2>
@@ -370,10 +475,60 @@ function SetupWizard({ onComplete }) {
         />
       </div>
     );
-  } else if (step === 4) {
+  } else if (step === STEP_SERVER) {
+    body = (
+      <div className="setup-step" key="server">
+        <h2 className="setup-title">Server & URLs</h2>
+        <p className="setup-lead">
+          Diese Werte werden in die <code>.env</code> geschrieben. Änderungen an
+          URL, Port oder Datenbankpfad greifen erst nach einem Neustart. Im Zweifel
+          einfach überspringen — die Standardwerte funktionieren lokal.
+        </p>
+        <SetupField
+          label="Öffentliche Basis-URL"
+          value={publicBaseUrl}
+          onChange={setPublicBaseUrl}
+          placeholder="http://localhost:3000"
+          hint="Wird für Webhook-Links und Kommentare verwendet."
+          autoFocus
+        />
+        <SetupField
+          label="Port"
+          value={port}
+          onChange={(v) => setPort(v.replace(/[^0-9]/g, "").slice(0, 5))}
+          placeholder="3000"
+        />
+        <SetupField
+          label="Datenbank-Pfad"
+          value={databaseUrl}
+          onChange={setDatabaseUrl}
+          placeholder="./data/knowflow.sqlite"
+        />
+        <div className="setup-field">
+          <label className="setup-label setup-check-label">
+            <input
+              type="checkbox"
+              checked={webhookDebug}
+              onChange={(e) => setWebhookDebug(e.target.checked)}
+            />
+            <span>Webhook-Debug aktivieren</span>
+          </label>
+          <label className="setup-label setup-check-label">
+            <input
+              type="checkbox"
+              checked={uiDebug}
+              onChange={(e) => setUiDebug(e.target.checked)}
+            />
+            <span>UI-Debug-Panel aktivieren</span>
+          </label>
+        </div>
+      </div>
+    );
+  } else if (step === STEP_SUMMARY) {
     // Zusammenfassung: spiegelt die getroffenen Entscheidungen inkl. Skip-Status.
     const jiraOn = !jiraSkipped && jiraHasValues;
     const targetOn = !targetSkipped && targetHasValues;
+    const serverOn = !serverSkipped;
     body = (
       <div className="setup-step" key="summary">
         <h2 className="setup-title">Zusammenfassung</h2>
@@ -402,11 +557,18 @@ function SetupWizard({ onComplete }) {
               {targetOn ? (targetName || targetUrl || "konfiguriert") : "übersprungen"}
             </span>
           </div>
+          <div className="setup-summary-row">
+            <i className={"bi " + (serverOn ? "bi-check-circle-fill setup-sum-ok" : "bi-dash-circle setup-sum-skip")}></i>
+            <span className="setup-sum-label">Server</span>
+            <span className="setup-sum-val">
+              {serverOn ? (publicBaseUrl || "Standardwerte") : "übersprungen"}
+            </span>
+          </div>
         </div>
       </div>
     );
   } else {
-    // step === 5: Erfolg
+    // step === STEP_DONE: Erfolg
     body = (
       <div className="setup-step setup-step-center" key="done">
         <div className="setup-check">
@@ -416,7 +578,8 @@ function SetupWizard({ onComplete }) {
         <h2 className="setup-title">Alles eingerichtet!</h2>
         <p className="setup-lead">
           Du bist angemeldet. Alle Einstellungen kannst du jederzeit im
-          Admin-Bereich anpassen.
+          Admin-Bereich anpassen. Server-Änderungen (URL, Port, Datenbank) greifen
+          nach dem nächsten Neustart.
         </p>
       </div>
     );
@@ -424,19 +587,24 @@ function SetupWizard({ onComplete }) {
 
   // ---- Fußzeile -----------------------------------------------------------
   // Primär-Button und Beschriftung hängen vom aktuellen Schritt ab.
-  const isOptionalStep = step === 2 || step === 3;
-  const canAdvance = step !== 1 || passwordValid;
+  const isOptionalStep = step === STEP_JIRA || step === STEP_KNOWLEDGE || step === STEP_SERVER;
 
   let primaryLabel = "Weiter";
   let primaryAction = goNext;
-  let primaryDisabled = !canAdvance;
-  if (step === 0) {
+  let primaryDisabled = false;
+  if (step === STEP_WELCOME) {
     primaryLabel = "Los geht's";
-  } else if (step === 4) {
+  } else if (step === STEP_PIN) {
+    primaryLabel = busy ? "Prüfe PIN…" : "PIN bestätigen";
+    primaryAction = verifyPin;
+    primaryDisabled = !pinValid || busy;
+  } else if (step === STEP_PASSWORD) {
+    primaryDisabled = !passwordValid;
+  } else if (step === STEP_SUMMARY) {
     primaryLabel = busy ? "Wird eingerichtet…" : "Setup abschließen";
     primaryAction = submit;
     primaryDisabled = busy;
-  } else if (step === 5) {
+  } else if (step === STEP_DONE) {
     primaryLabel = "Zum Dashboard";
     primaryAction = onComplete;
     primaryDisabled = false;
@@ -450,7 +618,7 @@ function SetupWizard({ onComplete }) {
           <div className="setup-header-text">KnowFlow · Ersteinrichtung</div>
         </div>
 
-        {step >= 1 && step <= 4 && (
+        {step >= STEP_PIN && step <= STEP_SUMMARY && (
           <>
             <SetupProgress step={step} />
             <SetupDots step={step} />
@@ -461,7 +629,7 @@ function SetupWizard({ onComplete }) {
 
         <div className="setup-footer">
           <div className="setup-footer-left">
-            {step >= 1 && step <= 4 && (
+            {step >= STEP_PIN && step <= STEP_SUMMARY && (
               <button className="btn-ghost" onClick={goBack}>
                 <i className="bi bi-arrow-left"></i>Zurück
               </button>
@@ -474,10 +642,10 @@ function SetupWizard({ onComplete }) {
               </button>
             )}
             <button className="btn-primary-x setup-primary" disabled={primaryDisabled} onClick={primaryAction}>
-              {step === 4 && busy && <i className="bi bi-arrow-repeat setup-spin"></i>}
+              {(step === STEP_SUMMARY || step === STEP_PIN) && busy && <i className="bi bi-arrow-repeat setup-spin"></i>}
               {primaryLabel}
-              {step !== 4 && step !== 5 && <i className="bi bi-arrow-right"></i>}
-              {step === 5 && <i className="bi bi-box-arrow-in-right"></i>}
+              {step !== STEP_SUMMARY && step !== STEP_DONE && step !== STEP_PIN && <i className="bi bi-arrow-right"></i>}
+              {step === STEP_DONE && <i className="bi bi-box-arrow-in-right"></i>}
             </button>
           </div>
         </div>

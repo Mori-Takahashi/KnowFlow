@@ -156,6 +156,36 @@ async function embedViaOpenAi(cfg, text) {
 }
 
 /**
+ * Requests an embedding from an existing Open WebUI connection. Reuses the
+ * URL + token of a configured knowledge target (referenced by cfg.targetId), so
+ * no separate provider has to be set up. The response is parsed defensively to
+ * cover both the OpenAI-style ({ data: [{ embedding }] }) and Ollama-style
+ * ({ embedding }) shapes Open WebUI may return depending on the backing model.
+ *
+ * @param {Object} cfg -> RAG config (must carry a targetId and model).
+ * @param {string} text -> Prepared input text.
+ * @returns {Promise<Float32Array>} -> The embedding vector.
+ * @throws {Error} -> When the connection is missing, or on HTTP/empty response.
+ */
+async function embedViaOpenWebUi(cfg, text) {
+  const target = settingsService.getTarget(cfg.targetId);
+  if (!target || !target.url) {
+    throw new Error('Keine Open-WebUI-Verbindung ausgewählt.');
+  }
+  const res = await axios.post(
+    `${target.url}/api/embeddings`,
+    { model: cfg.model, input: text },
+    { timeout: HTTP_TIMEOUT_MS, headers: { Authorization: `Bearer ${target.token || ''}` } },
+  );
+  const data = res.data;
+  const vec = (data && data.data && data.data[0] && data.data[0].embedding) || (data && data.embedding);
+  if (!Array.isArray(vec) || vec.length === 0) {
+    throw new Error('Open WebUI lieferte kein Embedding zurück (Modell geeignet?).');
+  }
+  return Float32Array.from(vec);
+}
+
+/**
  * Resolves the effective local model name, falling back to the bundled default
  * when the admin left the field empty.
  *
@@ -226,6 +256,8 @@ async function embed(text) {
     vector = await embedViaOllama(cfg, prepared);
   } else if (cfg.mode === RAG_MODE.OPENAI) {
     vector = await embedViaOpenAi(cfg, prepared);
+  } else if (cfg.mode === RAG_MODE.OPENWEBUI) {
+    vector = await embedViaOpenWebUi(cfg, prepared);
   } else {
     vector = await embedViaLocal(cfg, prepared);
   }
