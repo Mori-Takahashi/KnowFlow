@@ -172,24 +172,49 @@ Jira Cloud  ──webhook──▶  Express (POST /webhook/jira)
 git clone <repo>
 cd KnowFlow
 npm install
-cp .env.example .env
-# .env editieren: mindestens SETTINGS_ENCRYPTION_KEY setzen
 npm start
 ```
 
-Dashboard öffnen: <http://localhost:3000>
-Login via Sidebar-Eintrag **„Einstellungen"** mit dem `ADMIN_PASSWORD`.
+Es ist **keine `.env` nötig**: Fehlt sie, generiert KnowFlow beim ersten Start
+automatisch die nötigen Secrets (`SETTINGS_ENCRYPTION_KEY`, `SESSION_SECRET`),
+legt eine `.env` an und startet in den Browser-Setup-Modus. Wer die Werte lieber
+selbst setzt, kopiert vorab `cp .env.example .env` und trägt sie ein.
 
-### Ersteinrichtung (Setup-Assistent)
+Dashboard öffnen: <http://localhost:3000>
+Beim allerersten Start erscheint der **Setup-Assistent** (siehe unten). Danach
+Login via Sidebar-Eintrag **„Einstellungen"** mit dem im Setup gewählten Passwort
+(bzw. dem `ADMIN_PASSWORD`, falls vorgegeben).
+
+### Ersteinrichtung ohne `.env` (Browser-Setup + Konsolen-PIN)
 
 Ist beim ersten Start **kein** `ADMIN_PASSWORD` gesetzt, erscheint beim ersten
 Aufruf des Dashboards automatisch ein Setup-Assistent, der Schritt für Schritt
-durch die Grundeinrichtung führt: Admin-Passwort festlegen, optional die
-Jira-Verbindung und eine erste Wissensbasis konfigurieren. Nach Abschluss ist
-man direkt angemeldet; alle Einstellungen bleiben später im Admin-Dashboard
-änderbar. Bestehende Installationen (Admin-Passwort vorhanden) sehen den
-Assistenten nie — das Seeding über die `JIRA_*`-/`OPENWEBUI_*`-Variablen wird
-weiterhin unterstützt.
+durch die Grundeinrichtung führt.
+
+**PIN-Schutz:** Solange die Ersteinrichtung aussteht, gibt der Server bei jedem
+Start einen **6-stelligen PIN** in der Konsole aus:
+
+```
+========================================================
+  KNOWFLOW ERSTEINRICHTUNG — SETUP-PIN
+========================================================
+  Setup im Browser öffnen:  http://localhost:3000
+  PIN für die Anmeldung:    123456
+========================================================
+```
+
+Dieser PIN muss im ersten Schritt des Assistenten eingegeben werden und schaltet
+die restlichen Schritte frei (so kann nur jemand mit Zugriff auf die Server-Konsole
+das Setup durchführen). Der PIN gilt nur für den jeweiligen Serverstart und
+rotiert bei jedem Neustart, bis das Setup abgeschlossen ist.
+
+Der Assistent führt durch: **PIN** → Admin-Passwort → optional Jira-Verbindung →
+optional erste Wissensbasis → optional **Server & URLs** (`PUBLIC_BASE_URL`,
+`PORT`, `DATABASE_URL`, Debug-Flags; werden in die `.env` geschrieben und greifen
+nach dem nächsten Neustart) → Zusammenfassung. Nach Abschluss ist man direkt
+angemeldet; alle Einstellungen bleiben später im Admin-Dashboard änderbar.
+Bestehende Installationen (Admin-Passwort vorhanden) sehen den Assistenten nie —
+das Seeding über die `JIRA_*`-/`OPENWEBUI_*`-Variablen wird weiterhin unterstützt.
 
 ### Mit Docker
 
@@ -208,7 +233,7 @@ und exponiert Port `3000`. Ein Healthcheck pingt regelmäßig den HTTP-Root.
 | Variable                  | Beschreibung |
 |---------------------------|--------------|
 | `SETTINGS_ENCRYPTION_KEY` | Master-Key (≥ 16 Zeichen) für AES-Verschlüsselung der DB-Tokens. **Nicht nachträglich ändern** — gespeicherte Tokens werden sonst unlesbar. |
-| `ADMIN_PASSWORD`          | Initiales Admin-Passwort. Wird beim ersten Start gehasht in die DB übernommen und schaltet den Login frei. Optional — ohne diese Variable übernimmt der [Setup-Assistent](#ersteinrichtung-setup-assistent) die Ersteinrichtung im Browser. |
+| `ADMIN_PASSWORD`          | Initiales Admin-Passwort. Wird beim ersten Start gehasht in die DB übernommen und schaltet den Login frei. Optional — ohne diese Variable übernimmt der [Setup-Assistent](#ersteinrichtung-ohne-env-browser-setup--konsolen-pin) die Ersteinrichtung im Browser. |
 
 ### Seed beim Erststart (danach im Dashboard pflegbar)
 

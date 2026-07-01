@@ -9,6 +9,7 @@ const {
   OPENWEBUI_MODE,
   RAG_MODE,
   DEFAULT_RAG_CONFIG,
+  DEFAULT_QUICKCHAT_CONFIG,
   DEFAULT_FIELD_MAPPINGS,
   DEFAULT_MARKDOWN_OPTIONS,
   DEFAULT_UPDATE_REPO,
@@ -26,6 +27,7 @@ const KEY = Object.freeze({
   MARKDOWN_OPTIONS: 'markdownOptions',
   OPENWEBUI_MODE: 'openwebuiMode',
   RAG: 'rag',
+  QUICKCHAT: 'quickChat',
   FALLBACK_TARGETS: 'fallbackTargetIds',
   WEBHOOK_INGEST: 'webhookIngestEnabled',
   AUTH: 'auth',
@@ -428,6 +430,7 @@ function getRagConfig() {
       : DEFAULT_RAG_CONFIG.ollamaUrl,
     model: typeof raw.model === 'string' ? raw.model.trim() : DEFAULT_RAG_CONFIG.model,
     dim: Number.isFinite(raw.dim) ? raw.dim : DEFAULT_RAG_CONFIG.dim,
+    targetId: typeof raw.targetId === 'string' ? raw.targetId : DEFAULT_RAG_CONFIG.targetId,
     openaiApiKey: raw.openaiApiKey ? decrypt(raw.openaiApiKey) : '',
   };
 }
@@ -453,10 +456,57 @@ function setRagConfig(input) {
       : (current.ollamaUrl || DEFAULT_RAG_CONFIG.ollamaUrl),
     model: input.model != null ? String(input.model).trim() : (current.model || ''),
     dim: Number.isFinite(input.dim) ? input.dim : (current.dim || 0),
+    targetId: input.targetId != null ? String(input.targetId).trim() : (current.targetId || ''),
     openaiApiKey: current.openaiApiKey || '',
   };
   if (input.openaiApiKey) next.openaiApiKey = encrypt(input.openaiApiKey);
   writeJson(KEY.RAG, next);
+}
+
+// ---------------------------------------------------------------------------
+// Quick chat ("Schneller Chat") configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the quick-chat configuration merged with the defaults. All values are
+ * safe to keep server-side; the caller decides what to expose to the browser
+ * (the system prompt must never be sent to unauthenticated clients).
+ *
+ * @returns {Object} -> { enabled, targetId, allowedModels, systemPrompt, attachKnowledge }.
+ */
+function getQuickChatConfig() {
+  const raw = readJson(KEY.QUICKCHAT, {});
+  return {
+    enabled: Boolean(raw.enabled),
+    targetId: typeof raw.targetId === 'string' ? raw.targetId.trim() : DEFAULT_QUICKCHAT_CONFIG.targetId,
+    allowedModels: Array.isArray(raw.allowedModels)
+      ? raw.allowedModels.map((m) => String(m).trim()).filter((m) => m.length > 0)
+      : [],
+    systemPrompt: typeof raw.systemPrompt === 'string' ? raw.systemPrompt : DEFAULT_QUICKCHAT_CONFIG.systemPrompt,
+    attachKnowledge: raw.attachKnowledge == null ? DEFAULT_QUICKCHAT_CONFIG.attachKnowledge : Boolean(raw.attachKnowledge),
+  };
+}
+
+/**
+ * Persists the quick-chat configuration, coercing every field so a malformed
+ * payload can never corrupt the stored blob.
+ *
+ * @param {Object} input -> Partial quick-chat config from the admin UI.
+ * @returns {void}
+ */
+function setQuickChatConfig(input) {
+  log('setQuickChatConfig called');
+  const current = getQuickChatConfig();
+  const next = {
+    enabled: input.enabled == null ? current.enabled : Boolean(input.enabled),
+    targetId: input.targetId != null ? String(input.targetId).trim() : current.targetId,
+    allowedModels: Array.isArray(input.allowedModels)
+      ? Array.from(new Set(input.allowedModels.map((m) => String(m).trim()).filter((m) => m.length > 0)))
+      : current.allowedModels,
+    systemPrompt: input.systemPrompt != null ? String(input.systemPrompt) : current.systemPrompt,
+    attachKnowledge: input.attachKnowledge == null ? current.attachKnowledge : Boolean(input.attachKnowledge),
+  };
+  writeJson(KEY.QUICKCHAT, next);
 }
 
 /**
@@ -1049,6 +1099,7 @@ function resetRuntimeConfig() {
   writeJson(KEY.MARKDOWN_OPTIONS, { ...DEFAULT_MARKDOWN_OPTIONS });
   writeJson(KEY.OPENWEBUI_MODE, OPENWEBUI_MODE.DUMMY);
   writeJson(KEY.RAG, { ...DEFAULT_RAG_CONFIG });
+  writeJson(KEY.QUICKCHAT, { ...DEFAULT_QUICKCHAT_CONFIG, allowedModels: [] });
   writeJson(KEY.FALLBACK_TARGETS, []);
   writeJson(KEY.WEBHOOK_INGEST, true);
 
@@ -1080,6 +1131,8 @@ module.exports = {
   setOpenWebUiMode,
   getRagConfig,
   setRagConfig,
+  getQuickChatConfig,
+  setQuickChatConfig,
   getFallbackTargetIds,
   setFallbackTargetIds,
   getWebhookIngestEnabled,

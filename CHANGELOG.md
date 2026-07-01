@@ -9,6 +9,51 @@ Das Format orientiert sich an
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-01
+
+### Added
+
+- **Schneller Chat (temporärer Wissens-Chat im Dashboard)**: Ein neuer, per
+  Admin ein-/ausschaltbarer Chat, den jeder Dashboard-Besucher nutzen kann. Er
+  läuft über den Open-WebUI-API-Key einer ausgewählten Wissensbasis und bezieht
+  sein Wissen aus deren Knowledge-Collection (Open-WebUI-RAG, Anhängen der
+  Collection an jede Anfrage). Der Administrator legt fest, welche Modelle erlaubt
+  sind, und kann einen serverseitigen System-Prompt hinterlegen (wird nie an den
+  Browser ausgeliefert). Antworten werden per Server-Sent-Events Token für Token
+  gestreamt. Unterhaltungen sind rein temporär und werden **nicht** gespeichert;
+  die Funktion erfordert den `real`-Modus. Neuer Tab „Schneller Chat" im Dashboard
+  (nur sichtbar, wenn aktiviert) sowie ein Konfigurations-Tab in den Einstellungen.
+
+- **Open WebUI als Embedding-Provider (RAG-Modus „Open WebUI")**: Neuer, fünfter
+  RAG-Modus, der eine bereits konfigurierte Open-WebUI-Wissensbasis (URL + Token)
+  für die Embeddings wiederverwendet, statt einen separaten Anbieter zu verlangen.
+  Der Admin wählt eine bestehende Verbindung, validiert den Key, scannt die
+  verfügbaren Modelle und wählt ein für Embeddings geeignetes Modell (per
+  Namensheuristik gekennzeichnet). Schließt #12.
+
+- **Schlüsselfertige Ersteinrichtung ohne `.env` + Konsolen-PIN**: KnowFlow
+  startet jetzt auch ohne vorhandene `.env` — fehlende `SETTINGS_ENCRYPTION_KEY`/
+  `SESSION_SECRET` werden automatisch erzeugt, in eine `.env` geschrieben, und der
+  Setup-Assistent übernimmt. Solange die Einrichtung aussteht, wird bei jedem Start
+  eine frische 6-stellige PIN in der Konsole ausgegeben, die der Assistent vor dem
+  Fortfahren verifizieren muss (kurzlebige Setup-Session). Der Assistent erhielt
+  einen PIN-Schritt und einen optionalen Schritt „Server & URLs", der ausgewählte
+  Infrastruktur-Werte (`PUBLIC_BASE_URL`, `PORT`, `DATABASE_URL`, Debug-Flags) in
+  die `.env` schreibt; Jira/Open WebUI bleiben in der Datenbank als Quelle der
+  Wahrheit.
+
+### Fixed
+
+- **CWE — OAuth-Authorize-Formular von der CSRF-Prüfung ausgenommen**: Die
+  Double-Submit-Cookie-CSRF-Middleware blockierte `POST /oauth/authorize`, wodurch
+  der MCP-OAuth-Login nach dem Absenden des Passworts mit „CSRF-Token fehlt oder
+  ungültig." fehlschlug (#16). Die Authorize-Login-Seite ist ein reines HTML-Formular
+  und kann den erforderlichen `x-csrf-token`-Header nicht senden; da sich der
+  Endpunkt ohnehin über das Passwort im Request-Body neu authentifiziert (statt über
+  eine Session-Cookie), ist CSRF hier nicht anwendbar. `/oauth/authorize` wurde zu
+  den `CSRF_EXEMPT_PREFIXES` hinzugefügt — neben den bereits ausgenommenen
+  `/oauth/token`- und `/oauth/register`-Endpunkten.
+
 ## [1.3.2] - 2026-06-29
 
 ### Security

@@ -5,13 +5,17 @@ const crypto = require('crypto');
 const CSRF_COOKIE = 'kf-csrf';
 const CSRF_HEADER = 'x-csrf-token';
 
-// Endpoints that authenticate via HMAC signature or Bearer token — they don't
-// rely on cookies and are therefore not subject to CSRF.
+// Endpoints that don't rely on an ambient session cookie for authentication and
+// are therefore not subject to CSRF: HMAC- or Bearer-token-authenticated APIs,
+// plus the browser-rendered OAuth login form which re-authenticates via the
+// password submitted in the request body (a plain HTML form cannot send the
+// x-csrf-token header, and forging it would require knowing the password).
 const CSRF_EXEMPT_PREFIXES = [
   '/webhook/',
   '/mcp/',
   '/oauth/token',
   '/oauth/register',
+  '/oauth/authorize',
   '/api/setup',
   '/.well-known/',
 ];

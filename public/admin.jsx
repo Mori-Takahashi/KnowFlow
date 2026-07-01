@@ -333,6 +333,11 @@ function AdminRag({ config, reloadConfig }) {
   const [ollamaUrl, setOllamaUrl] = React.useState(r.ollamaUrl || "http://localhost:11434");
   const [model, setModel] = React.useState(r.model || "");
   const [openaiApiKey, setOpenaiApiKey] = React.useState("");
+  const [targetId, setTargetId] = React.useState(r.targetId || "");
+  const [targets, setTargets] = React.useState([]);
+  const [owModels, setOwModels] = React.useState([]);
+  const [scanMsg, setScanMsg] = React.useState(null);
+  const [scanning, setScanning] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const [testMsg, setTestMsg] = React.useState(null);
   const [status, setStatus] = React.useState(null);
@@ -342,6 +347,32 @@ function AdminRag({ config, reloadConfig }) {
   }, []);
 
   React.useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  // The Open WebUI mode reuses an existing knowledge-target connection; load the
+  // list so the admin can pick which one to embed against.
+  React.useEffect(() => {
+    adminApi("GET", "/targets").then((res) => setTargets(res.targets || [])).catch(() => {});
+  }, []);
+
+  const scanModels = async () => {
+    if (!targetId) {
+      setScanMsg({ kind: "err", text: "Bitte zuerst eine Open-WebUI-Verbindung wählen." });
+      return;
+    }
+    setScanning(true);
+    setScanMsg({ kind: "info", text: "Prüfe Key & lade Modelle..." });
+    try {
+      const res = await adminApi("POST", "/config/rag/openwebui/models", { targetId });
+      const models = res.models || [];
+      setOwModels(models);
+      setScanMsg({ kind: "ok", text: `${models.length} Modell(e) gefunden. Bitte ein für Embeddings geeignetes Modell wählen.` });
+    } catch (err) {
+      setOwModels([]);
+      setScanMsg({ kind: "err", text: err.message });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   // While a reindex runs, poll the status so the progress bar advances live.
   React.useEffect(() => {
@@ -357,6 +388,9 @@ function AdminRag({ config, reloadConfig }) {
       // Local mode reuses the model field; fall back to the bundled default so
       // the stored model tag matches what the server actually embeds with.
       if (mode === "local" && !model.trim()) body.model = "Xenova/multilingual-e5-small";
+      // Open WebUI mode reuses an existing connection (URL + token live in the
+      // target); only the chosen connection id and model need to be persisted.
+      if (mode === "openwebui") body.targetId = targetId;
       if (openaiApiKey) body.openaiApiKey = openaiApiKey;
       await adminApi("PUT", "/config/rag", body);
       setOpenaiApiKey("");
@@ -394,6 +428,7 @@ function AdminRag({ config, reloadConfig }) {
     { id: "local", label: "Lokal (im Server)" },
     { id: "openai", label: "OpenAI" },
     { id: "ollama", label: "Ollama (lokal)" },
+    { id: "openwebui", label: "Open WebUI" },
   ];
   const prog = status && status.progress;
   const pct = prog && prog.total > 0 ? Math.round(((prog.done + prog.failed) / prog.total) * 100) : 0;
@@ -448,6 +483,60 @@ function AdminRag({ config, reloadConfig }) {
               />
             </>
           )}
+          {mode === "openwebui" && (
+            <>
+              <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 0 }}>
+                Nutzt eine bereits eingerichtete Open-WebUI-Verbindung (URL + Key) für die
+                Embeddings — kein zusätzlicher Anbieter nötig. Wähle die Verbindung, prüfe den
+                Key und wähle anschließend ein passendes Embedding-Modell.
+              </p>
+              {scanMsg && <Banner kind={scanMsg.kind}>{scanMsg.text}</Banner>}
+              {targets.length === 0 ? (
+                <Banner kind="info">
+                  Es ist noch keine Open-WebUI-Verbindung hinterlegt. Lege zuerst im Tab
+                  <b> Wissensbasen</b> eine Verbindung an.
+                </Banner>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <div className="k" style={{ marginBottom: 6 }}>Open-WebUI-Verbindung</div>
+                    <select
+                      value={targetId}
+                      disabled={!canEdit}
+                      onChange={(e) => { setTargetId(e.target.value); setOwModels([]); setScanMsg(null); }}
+                      style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}
+                    >
+                      <option value="">— Verbindung wählen —</option>
+                      {targets.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}{t.url ? ` (${t.url})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button className="btn-ghost" style={{ padding: "5px 10px", marginBottom: 12 }} onClick={scanModels} disabled={!canEdit || !targetId || scanning}>
+                    <i className="bi bi-search"></i>{scanning ? "Lädt..." : "Key prüfen & Modelle laden"}
+                  </button>
+                  {owModels.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div className="k" style={{ marginBottom: 6 }}>Embedding-Modell</div>
+                      <select
+                        value={model}
+                        disabled={!canEdit}
+                        onChange={(e) => setModel(e.target.value)}
+                        style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}
+                      >
+                        <option value="">— Modell wählen —</option>
+                        {owModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.label}{m.embeddingCapable ? " — für Embeddings geeignet" : " — vermutlich ungeeignet"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
           {mode !== "off" && (
             <button className="btn-primary-x" onClick={save} disabled={!canEdit}><i className="bi bi-save"></i>Speichern</button>
           )}
@@ -481,6 +570,143 @@ function AdminRag({ config, reloadConfig }) {
         </div>
       )}
     </>
+  );
+}
+
+// ============================================================
+// Tab: Schneller Chat
+// ============================================================
+function AdminQuickChat({ targets }) {
+  const { canEdit } = React.useContext(AdminCtx);
+  const [cfg, setCfg] = React.useState(null);
+  const [enabled, setEnabled] = React.useState(false);
+  const [targetId, setTargetId] = React.useState("");
+  const [attachKnowledge, setAttachKnowledge] = React.useState(true);
+  const [systemPrompt, setSystemPrompt] = React.useState("");
+  const [allowedModels, setAllowedModels] = React.useState([]);
+  const [models, setModels] = React.useState([]);
+  const [modelsMsg, setModelsMsg] = React.useState(null);
+  const [loadingModels, setLoadingModels] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+
+  React.useEffect(() => {
+    adminApi("GET", "/config/quickchat")
+      .then((c) => {
+        setCfg(c);
+        setEnabled(Boolean(c.enabled));
+        setTargetId(c.targetId || "");
+        setAttachKnowledge(c.attachKnowledge !== false);
+        setSystemPrompt(c.systemPrompt || "");
+        setAllowedModels(Array.isArray(c.allowedModels) ? c.allowedModels : []);
+      })
+      .catch((e) => setMsg({ kind: "err", text: e.message }));
+  }, []);
+
+  const loadModels = async () => {
+    if (!targetId) { setModelsMsg({ kind: "err", text: "Bitte zuerst eine Wissensbasis wählen." }); return; }
+    setLoadingModels(true);
+    setModelsMsg({ kind: "info", text: "Lade Modelle..." });
+    try {
+      const d = await adminApi("GET", "/config/quickchat/models?targetId=" + encodeURIComponent(targetId));
+      setModels(d.models || []);
+      setModelsMsg({ kind: "ok", text: (d.models || []).length + " Modelle gefunden." });
+    } catch (err) {
+      setModels([]);
+      setModelsMsg({ kind: "err", text: err.message });
+    } finally {
+      setLoadingModels(false);
+    }
+  };
+
+  const toggleModel = (id) => {
+    setAllowedModels((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
+  };
+
+  const save = async () => {
+    setMsg(null);
+    try {
+      await adminApi("PUT", "/config/quickchat", { enabled, targetId, attachKnowledge, systemPrompt, allowedModels });
+      setMsg({ kind: "ok", text: "Schneller-Chat-Einstellungen gespeichert. Der Tab erscheint nach dem Neuladen des Dashboards." });
+    } catch (err) {
+      setMsg({ kind: "err", text: err.message });
+    }
+  };
+
+  if (!cfg) return <div className="empty"><i className="bi bi-hourglass"></i><div>Lade...</div></div>;
+
+  const modelIds = models.map((m) => m.id);
+  const extraAllowed = allowedModels.filter((m) => !modelIds.includes(m));
+  const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, marginBottom: 12 };
+
+  return (
+    <div className="card-x">
+      <div className="card-head"><h6>Schneller Chat</h6></div>
+      <div className="card-body-x">
+        {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
+        <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 0 }}>
+          Aktiviert einen temporären Chat im Dashboard, den jeder Besucher nutzen kann. Er läuft über
+          den OpenWebUI-API-Key der gewählten Wissensbasis und bezieht sein Wissen aus deren
+          Knowledge-Collection. Unterhaltungen werden nicht gespeichert. Erfordert den „Real"-Modus.
+        </p>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13 }}>
+          <input type="checkbox" checked={enabled} disabled={!canEdit} onChange={(e) => setEnabled(e.target.checked)} />
+          Schnellen Chat aktivieren
+        </label>
+
+        <div className="k" style={{ marginBottom: 6 }}>Wissensbasis (Chat-Backend)</div>
+        <select value={targetId} disabled={!canEdit} onChange={(e) => setTargetId(e.target.value)} style={inputStyle}>
+          <option value="">— auswählen —</option>
+          {(targets || []).map((t) => (
+            <option key={t.id} value={t.id}>{t.name}{t.enabled ? "" : " (deaktiviert)"}</option>
+          ))}
+        </select>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13 }}>
+          <input type="checkbox" checked={attachKnowledge} disabled={!canEdit} onChange={(e) => setAttachKnowledge(e.target.checked)} />
+          Wissensbasis an jede Anfrage anhängen (RAG)
+        </label>
+
+        <div className="k" style={{ marginBottom: 6 }}>System-Prompt</div>
+        <textarea
+          value={systemPrompt}
+          disabled={!canEdit}
+          onChange={(e) => setSystemPrompt(e.target.value)}
+          rows={4}
+          placeholder="z. B. Du bist der KnowFlow-Assistent und antwortest nur anhand der Wissensbasis..."
+          style={{ ...inputStyle, marginBottom: 16, fontFamily: "inherit", resize: "vertical" }}
+        />
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <div className="k">Erlaubte Modelle</div>
+          <button className="btn-ghost" style={{ padding: "5px 10px" }} disabled={!canEdit || loadingModels || !targetId} onClick={loadModels}>
+            <i className="bi bi-arrow-repeat"></i>{loadingModels ? "Lädt..." : "Modelle laden"}
+          </button>
+        </div>
+        {modelsMsg && <Banner kind={modelsMsg.kind}>{modelsMsg.text}</Banner>}
+        {models.length === 0 && extraAllowed.length === 0 && (
+          <p style={{ fontSize: 12.5, color: "var(--muted)" }}>Noch keine Modelle geladen. Wähle eine Wissensbasis und klicke „Modelle laden".</p>
+        )}
+        {(models.length > 0 || extraAllowed.length > 0) && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+            {models.map((m) => (
+              <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                <input type="checkbox" checked={allowedModels.includes(m.id)} disabled={!canEdit} onChange={() => toggleModel(m.id)} />
+                {m.label || m.id}<span style={{ color: "var(--muted-2)", fontSize: 11 }}>{m.id}</span>
+              </label>
+            ))}
+            {extraAllowed.map((id) => (
+              <label key={id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, opacity: 0.8 }}>
+                <input type="checkbox" checked disabled={!canEdit} onChange={() => toggleModel(id)} />
+                {id}<span style={{ color: "var(--muted-2)", fontSize: 11 }}>(nicht in der geladenen Liste)</span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        <button className="btn-primary-x" onClick={save} disabled={!canEdit}><i className="bi bi-save"></i>Speichern</button>
+      </div>
+    </div>
   );
 }
 
@@ -1824,6 +2050,7 @@ function AdminPanel({ role, permissions, onLogout }) {
       { id: "routing", label: "Routing-Regeln", icon: "bi-diagram-3" },
       { id: "mcp", label: "MCP-Verbindungen", icon: "bi-hdd-network" },
       { id: "rag", label: "RAG", icon: "bi-stars" },
+      { id: "quickchat", label: "Schneller Chat", icon: "bi-chat-dots" },
       { id: "markdown", label: "Markdown", icon: "bi-markdown" },
     );
   }
@@ -1905,6 +2132,7 @@ function AdminPanel({ role, permissions, onLogout }) {
       {activeTab === "routing" && <AdminRouting config={config} targets={targets} mcpConnections={mcpConnections} rules={rules} reloadRules={reloadRules} />}
       {activeTab === "mcp" && <AdminMcp mcpConnections={mcpConnections} reloadMcp={reloadMcp} />}
       {activeTab === "rag" && <AdminRag config={config} reloadConfig={reloadConfig} />}
+      {activeTab === "quickchat" && <AdminQuickChat targets={targets} />}
       {activeTab === "markdown" && <AdminMarkdown config={config} reloadConfig={reloadConfig} />}
       {activeTab === "updates" && isAdmin && <AdminUpdates />}
       {activeTab === "access" && isAdmin && <AdminAccess />}

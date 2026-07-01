@@ -178,6 +178,7 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
           ollamaUrl: r.ollamaUrl,
           model: r.model,
           dim: r.dim,
+          targetId: r.targetId,
           hasOpenaiApiKey: Boolean(r.openaiApiKey),
           openaiApiKeyMasked: r.openaiApiKey ? maskSecret(r.openaiApiKey) : '',
         };
@@ -239,6 +240,21 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
     res.json(embeddingService.getStatus());
   });
 
+  router.post('/config/rag/openwebui/models', requireView, async (req, res) => {
+    log('POST /config/rag/openwebui/models');
+    const target = settingsService.getTarget(req.body?.targetId);
+    if (!target) {
+      res.status(404).json({ error: 'Open-WebUI-Verbindung nicht gefunden' });
+      return;
+    }
+    try {
+      const models = await openwebuiService.listModels(target);
+      res.json({ models });
+    } catch (err) {
+      res.status(502).json({ error: `Modelle konnten nicht geladen werden: ${err.message}` });
+    }
+  });
+
   router.post('/config/rag/reindex', requireEdit, (_req, res) => {
     log('POST /config/rag/reindex');
     if (!embeddingService.isEnabled()) {
@@ -251,6 +267,36 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
       console.error('[admin] RAG reindex failed:', err.message);
     });
     res.json({ started: true });
+  });
+
+  // ---- Quick chat ("Schneller Chat") --------------------------------------
+
+  router.get('/config/quickchat', requireView, (_req, res) => {
+    log('GET /config/quickchat');
+    // Admins may see the full config including the system prompt.
+    res.json(settingsService.getQuickChatConfig());
+  });
+
+  router.put('/config/quickchat', requireEdit, (req, res) => {
+    log('PUT /config/quickchat');
+    settingsService.setQuickChatConfig(req.body || {});
+    res.json({ ok: true });
+  });
+
+  router.get('/config/quickchat/models', requireView, async (req, res) => {
+    log('GET /config/quickchat/models');
+    const targetId = req.query?.targetId || settingsService.getQuickChatConfig().targetId;
+    const target = targetId ? settingsService.getTarget(targetId) : null;
+    if (!target) {
+      res.status(400).json({ error: 'Keine gültige Wissensbasis ausgewählt.' });
+      return;
+    }
+    try {
+      const models = await openwebuiService.listModels(target);
+      res.json({ models });
+    } catch (err) {
+      res.status(502).json({ error: `Modelle konnten nicht geladen werden: ${err.message}` });
+    }
   });
 
   router.put('/field-mappings', requireEdit, (req, res) => {
