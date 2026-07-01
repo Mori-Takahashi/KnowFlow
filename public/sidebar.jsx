@@ -1,4 +1,4 @@
-function Sidebar({ active, setActive, counts, access, onLogout }) {
+function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout }) {
   const items = [
     { id: "home", label: "Startseite", icon: "bi-house-door" },
     { id: "tickets", label: "Tickets", icon: "bi-ticket-perforated", badge: counts.tickets },
@@ -7,6 +7,10 @@ function Sidebar({ active, setActive, counts, access, onLogout }) {
     { id: "mcp", label: "MCP", icon: "bi-diagram-3" },
     { id: "logs", label: "Logs", icon: "bi-terminal" },
   ];
+  // The temporary chat only appears when an admin has enabled it.
+  if (quickChatEnabled) {
+    items.splice(4, 0, { id: "chat", label: "Schneller Chat", icon: "bi-chat-dots" });
+  }
   // Debug entry only appears when the server runs with UI_DEBUG=true.
   if (window.KNOWFLOW_DEBUG_ENABLED) {
     items.push({ id: "debug", label: "Debug", icon: "bi-bug" });

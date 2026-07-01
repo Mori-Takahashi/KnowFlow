@@ -5,7 +5,7 @@ const debug = require('debug');
 
 const queries = require('../db/queries');
 const debugState = require('../services/debugState');
-const { TICKETS_PER_PAGE, TICKET_STATUS, TICKET_LIFECYCLE, HEALTH_CACHE_TTL_MS } = require('../constants');
+const { TICKETS_PER_PAGE, TICKET_STATUS, TICKET_LIFECYCLE, HEALTH_CACHE_TTL_MS, QUICKCHAT_MAX_MESSAGES, QUICKCHAT_MAX_CHARS, OPENWEBUI_MODE } = require('../constants');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
 const log = debug('knowflow:routes:api');
@@ -126,6 +126,9 @@ function createApiRouter({ workflowService, jiraService, openwebuiService, setti
   const router = express.Router();
 
   const apiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 120 });
+  // Stricter limit for the quick-chat completion endpoint: it forwards to the
+  // shared OpenWebUI API key, so it must be harder to abuse than plain reads.
+  const chatLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 20 });
 
   /**
    * Resolves the session role from the request cookie.
@@ -517,6 +520,106 @@ function createApiRouter({ workflowService, jiraService, openwebuiService, setti
       console.error('[api] /sync failed:', err.message);
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // ---- Quick chat ("Schneller Chat") --------------------------------------
+
+  // Public (within the dashboard) probe: exposes only what the browser needs to
+  // render the chat. The system prompt and the target token are never sent.
+  router.get('/quickchat/config', (_req, res) => {
+    log('GET /api/quickchat/config');
+    const cfg = settingsService.getQuickChatConfig();
+    const target = cfg.targetId ? settingsService.getTarget(cfg.targetId) : null;
+    const usable = cfg.enabled && Boolean(target && target.enabled)
+      && settingsService.getOpenWebUiMode() === OPENWEBUI_MODE.REAL;
+    res.json({
+      enabled: usable,
+      models: usable ? cfg.allowedModels : [],
+      hasKnowledge: usable && cfg.attachKnowledge && Boolean(target && target.knowledgeId),
+    });
+  });
+
+  // Streaming chat completion. Enforces the model allow-list and prepends the
+  // server-side system prompt, then pipes OpenWebUI's SSE stream to the client.
+  router.post('/quickchat/completions', chatLimiter, async (req, res) => {
+    log('POST /api/quickchat/completions');
+    const cfg = settingsService.getQuickChatConfig();
+    if (!cfg.enabled) {
+      res.status(403).json({ error: 'Schneller Chat ist deaktiviert.' });
+      return;
+    }
+    if (settingsService.getOpenWebUiMode() !== OPENWEBUI_MODE.REAL) {
+      res.status(400).json({ error: 'Schneller Chat ist im Dummy-Modus nicht verfügbar.' });
+      return;
+    }
+    const target = cfg.targetId ? settingsService.getTarget(cfg.targetId) : null;
+    if (!target || !target.enabled) {
+      res.status(400).json({ error: 'Keine gültige Wissensbasis konfiguriert.' });
+      return;
+    }
+    const model = String(req.body?.model || '');
+    if (!cfg.allowedModels.includes(model)) {
+      res.status(400).json({ error: 'Das gewählte Modell ist nicht erlaubt.' });
+      return;
+    }
+    const clientMessages = Array.isArray(req.body?.messages) ? req.body.messages : null;
+    if (!clientMessages || clientMessages.length === 0) {
+      res.status(400).json({ error: 'Keine Nachrichten übergeben.' });
+      return;
+    }
+    if (clientMessages.length > QUICKCHAT_MAX_MESSAGES) {
+      res.status(400).json({ error: 'Zu viele Nachrichten in dieser Unterhaltung.' });
+      return;
+    }
+
+    // Build the message list: the server-side system prompt is authoritative and
+    // always first; client-supplied roles are clamped to user/assistant so a
+    // caller can never inject an additional system prompt.
+    const messages = [];
+    if (cfg.systemPrompt && cfg.systemPrompt.trim()) {
+      messages.push({ role: 'system', content: cfg.systemPrompt });
+    }
+    let totalChars = 0;
+    for (const m of clientMessages) {
+      const role = m && m.role === 'assistant' ? 'assistant' : 'user';
+      const content = typeof m?.content === 'string' ? m.content : '';
+      totalChars += content.length;
+      messages.push({ role, content });
+    }
+    if (totalChars > QUICKCHAT_MAX_CHARS) {
+      res.status(400).json({ error: 'Die Unterhaltung ist zu lang.' });
+      return;
+    }
+
+    const files = cfg.attachKnowledge && target.knowledgeId
+      ? [{ type: 'collection', id: target.knowledgeId }]
+      : [];
+
+    let upstream;
+    try {
+      upstream = await openwebuiService.chatCompletionStream(target, { model, messages, files });
+    } catch (err) {
+      console.error('[api] quickchat completion failed:', err.message);
+      res.status(502).json({ error: 'Die Chat-Anfrage ist fehlgeschlagen.' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+    req.on('close', () => {
+      if (typeof upstream.destroy === 'function') upstream.destroy();
+    });
+    upstream.on('error', (err) => {
+      console.error('[api] quickchat stream error:', err.message);
+      if (!res.writableEnded) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: 'Streaming-Fehler.' })}\n\n`);
+        res.end();
+      }
+    });
+    upstream.pipe(res);
   });
 
   return router;
