@@ -269,6 +269,36 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
     res.json({ started: true });
   });
 
+  // ---- Quick chat ("Schneller Chat") --------------------------------------
+
+  router.get('/config/quickchat', requireView, (_req, res) => {
+    log('GET /config/quickchat');
+    // Admins may see the full config including the system prompt.
+    res.json(settingsService.getQuickChatConfig());
+  });
+
+  router.put('/config/quickchat', requireEdit, (req, res) => {
+    log('PUT /config/quickchat');
+    settingsService.setQuickChatConfig(req.body || {});
+    res.json({ ok: true });
+  });
+
+  router.get('/config/quickchat/models', requireView, async (req, res) => {
+    log('GET /config/quickchat/models');
+    const targetId = req.query?.targetId || settingsService.getQuickChatConfig().targetId;
+    const target = targetId ? settingsService.getTarget(targetId) : null;
+    if (!target) {
+      res.status(400).json({ error: 'Keine gültige Wissensbasis ausgewählt.' });
+      return;
+    }
+    try {
+      const models = await openwebuiService.listModels(target);
+      res.json({ models });
+    } catch (err) {
+      res.status(502).json({ error: `Modelle konnten nicht geladen werden: ${err.message}` });
+    }
+  });
+
   router.put('/field-mappings', requireEdit, (req, res) => {
     log('PUT /field-mappings');
     settingsService.setFieldMappings(req.body || {});

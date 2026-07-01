@@ -236,6 +236,28 @@ const DEFAULT_RAG_CONFIG = Object.freeze({
 });
 
 /**
+ * Default "Schneller Chat" (quick chat) configuration. Disabled until an admin
+ * turns it on and picks a knowledge target as the chat backend. `allowedModels`
+ * is the server-enforced allow-list of model ids; `systemPrompt` is prepended
+ * server-side and never sent to the browser; `attachKnowledge` toggles whether
+ * the target's OpenWebUI knowledge collection is attached to each completion.
+ */
+const DEFAULT_QUICKCHAT_CONFIG = Object.freeze({
+  enabled: false,
+  targetId: '',
+  allowedModels: Object.freeze([]),
+  systemPrompt: '',
+  attachKnowledge: true,
+});
+
+/**
+ * Maximum number of messages and characters accepted per quick-chat completion
+ * request. Guards the shared OpenWebUI API key against oversized/abusive payloads.
+ */
+const QUICKCHAT_MAX_MESSAGES = 40;
+const QUICKCHAT_MAX_CHARS = 24000;
+
+/**
  * Maximum number of characters of ticket markdown fed into the embedding model.
  * Generous enough to cover description + solution of a typical ticket while
  * staying within the context window of small embedding models.
@@ -340,6 +362,13 @@ const TICKETS_PER_PAGE = 10;
 const HTTP_TIMEOUT_MS = 15000;
 
 /**
+ * HTTP timeout for streaming chat completions in milliseconds. Generation can
+ * take well beyond the 15s used for regular API calls, so quick chat gets a
+ * more generous window.
+ */
+const CHAT_TIMEOUT_MS = 120000;
+
+/**
  * TTL for the cached /api/health response in milliseconds.
  * The endpoint hits Jira and Open WebUI on every miss, so a short TTL
  * multiplies request volume against external rate limits. 30 minutes is the
@@ -396,6 +425,9 @@ module.exports = {
   DEFAULT_LOCAL_EMBED_MODEL,
   EMBEDDING_STATUS,
   DEFAULT_RAG_CONFIG,
+  DEFAULT_QUICKCHAT_CONFIG,
+  QUICKCHAT_MAX_MESSAGES,
+  QUICKCHAT_MAX_CHARS,
   EMBEDDING_MAX_CHARS,
   LOGICAL_FIELDS,
   DEFAULT_FIELD_MAPPINGS,
@@ -408,6 +440,7 @@ module.exports = {
   DEFAULT_ACCESS_CONFIG,
   TICKETS_PER_PAGE,
   HTTP_TIMEOUT_MS,
+  CHAT_TIMEOUT_MS,
   HEALTH_CACHE_TTL_MS,
   COMMENT_ERROR_MAX_LENGTH,
   COMMENT_TEMPLATES,

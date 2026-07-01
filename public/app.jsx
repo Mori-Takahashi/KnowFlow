@@ -76,6 +76,16 @@ function App() {
     loadAccess();
   }, [loadAccess]);
 
+  // Schneller Chat: whether the admin has enabled the temporary chat. Mirrored
+  // on window so the view can read the allowed models without re-fetching.
+  const [quickChatEnabled, setQuickChatEnabled] = React.useState(false);
+  React.useEffect(() => {
+    fetch("/api/quickchat/config")
+      .then((r) => r.json())
+      .then((c) => { window.KNOWFLOW_QUICKCHAT = c; setQuickChatEnabled(Boolean(c.enabled)); })
+      .catch(() => { window.KNOWFLOW_QUICKCHAT = { enabled: false, models: [], hasKnowledge: false }; });
+  }, []);
+
   // Expose tab navigation so the Debug panel can jump to a live view after
   // starting a simulation.
   React.useEffect(() => {
@@ -115,6 +125,7 @@ function App() {
   else if (active === "tickets") view = <Tickets />;
   else if (active === "activity") view = <Activity />;
   else if (active === "knowledge") view = <Knowledge />;
+  else if (active === "chat") view = quickChatEnabled ? <QuickChat /> : <Home />;
   else if (active === "mcp") view = <Mcp />;
   else if (active === "admin") view = <Admin />;
   else if (active === "debug") view = <Debug />;
@@ -129,7 +140,7 @@ function App() {
 
   return (
     <div className="shell">
-      <Sidebar active={active} setActive={setActive} counts={counts} access={access} onLogout={onLogout} />
+      <Sidebar active={active} setActive={setActive} counts={counts} access={access} quickChatEnabled={quickChatEnabled} onLogout={onLogout} />
       <main className="main" data-screen-label={"Tab · " + active}>
         {window.VersionNotices && <VersionNotices />}
         {view}
