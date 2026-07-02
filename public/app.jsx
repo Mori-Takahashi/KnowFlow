@@ -78,13 +78,18 @@ function App() {
 
   // Schneller Chat: whether the admin has enabled the temporary chat. Mirrored
   // on window so the view can read the allowed models without re-fetching.
+  // The /api/quickchat/config probe sits behind the dashboard-lock gate, so a
+  // locked dashboard returns 401 (enabled=false) until a session exists. It must
+  // therefore be re-fetched after login/logout, not just once on mount —
+  // otherwise the nav entry only appears after a full page reload.
   const [quickChatEnabled, setQuickChatEnabled] = React.useState(false);
-  React.useEffect(() => {
-    fetch("/api/quickchat/config")
+  const loadQuickChatConfig = React.useCallback(() => {
+    return fetch("/api/quickchat/config")
       .then((r) => r.json())
       .then((c) => { window.KNOWFLOW_QUICKCHAT = c; setQuickChatEnabled(Boolean(c.enabled)); })
-      .catch(() => { window.KNOWFLOW_QUICKCHAT = { enabled: false, models: [], hasKnowledge: false }; });
+      .catch(() => { window.KNOWFLOW_QUICKCHAT = { enabled: false, models: [], hasKnowledge: false }; setQuickChatEnabled(false); });
   }, []);
+  React.useEffect(() => { loadQuickChatConfig(); }, [loadQuickChatConfig]);
 
   // Expose tab navigation so the Debug panel can jump to a live view after
   // starting a simulation.
@@ -115,7 +120,7 @@ function App() {
     return (
       <LockScreen
         userLoginEnabled={access.userLoginEnabled}
-        onSuccess={() => loadAccess().then(() => { if (window.KNOWFLOW_FULL_RELOAD) window.KNOWFLOW_FULL_RELOAD(); })}
+        onSuccess={() => loadAccess().then(() => loadQuickChatConfig()).then(() => { if (window.KNOWFLOW_FULL_RELOAD) window.KNOWFLOW_FULL_RELOAD(); })}
       />
     );
   }
@@ -135,6 +140,7 @@ function App() {
     fetch("/api/admin/logout", { method: "POST", headers: { "x-csrf-token": window.getCsrfToken ? window.getCsrfToken() : "" } })
       .catch(() => {})
       .then(() => loadAccess())
+      .then(() => loadQuickChatConfig())
       .then(() => { if (window.KNOWFLOW_FULL_RELOAD) window.KNOWFLOW_FULL_RELOAD(); });
   };
 
