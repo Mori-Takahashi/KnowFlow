@@ -156,7 +156,7 @@ function QuickChat() {
             value={model}
             onChange={(e) => setModel(e.target.value)}
             disabled={busy}
-            style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}
+            style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 9, fontSize: 13, maxWidth: 220 }}
           >
             {models.length === 0 && <option value="">Kein Modell</option>}
             {models.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -167,7 +167,7 @@ function QuickChat() {
         </div>
       </div>
 
-      <div className="card-x" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 200px)", minHeight: 360 }}>
+      <div className="card-x chat-panel">
         <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
           {messages.length === 0 && (
             <div className="empty" style={{ margin: "auto" }}>
@@ -176,23 +176,10 @@ function QuickChat() {
             </div>
           )}
           {messages.map((m, i) => (
-            <div
-              key={i}
-              style={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "80%",
-                padding: "10px 14px",
-                borderRadius: 12,
-                fontSize: 13.5,
-                lineHeight: 1.5,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                background: m.role === "user" ? "var(--ink, #0f172a)" : "var(--panel, #f8fafc)",
-                color: m.role === "user" ? "#f8fafc" : "var(--ink, #0f172a)",
-                border: m.role === "user" ? "none" : "1px solid var(--border)",
-              }}
-            >
-              {m.content || (busy && i === messages.length - 1 ? "…" : "")}
+            <div key={i} className={"chat-bubble " + (m.role === "user" ? "user" : "assistant")}>
+              {m.content || (busy && i === messages.length - 1
+                ? <span className="typing-dots"><i></i><i></i><i></i></span>
+                : "")}
             </div>
           ))}
         </div>
@@ -207,7 +194,7 @@ function QuickChat() {
             rows={2}
             placeholder="Nachricht schreiben… (Enter zum Senden, Shift+Enter für neue Zeile)"
             disabled={busy || !model}
-            style={{ flex: 1, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13.5, fontFamily: "inherit", resize: "vertical" }}
+            style={{ flex: 1, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 9, fontSize: 13.5, fontFamily: "inherit", resize: "vertical" }}
           />
           {busy ? (
             <button className="btn-ghost" onClick={stop}><i className="bi bi-stop-circle"></i>Stopp</button>

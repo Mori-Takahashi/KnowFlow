@@ -37,6 +37,9 @@ window.getCsrfToken = function getCsrfToken() {
     FUNNEL: [],
     KNOWLEDGE_DOCS: [],
     LAST_UPDATE: Date.now(),
+    // false, bis der erste loadAll()-Durchlauf fertig ist — die App zeigt
+    // solange den Vollbild-Ladebildschirm statt eines leeren Dashboards.
+    READY: false,
   };
 
   window.KNOWFLOW_TICKETS_FILTER = { page: 1, filter: 'all', q: '' };
@@ -147,6 +150,9 @@ window.getCsrfToken = function getCsrfToken() {
       }));
     }
 
+    // Auch bei fehlgeschlagenen Requests (fetchJson liefert dann null) gilt der
+    // erste Ladevorgang als abgeschlossen — sonst bliebe der Boot-Screen hängen.
+    window.KNOWFLOW_DATA.READY = true;
     notify();
   }
 

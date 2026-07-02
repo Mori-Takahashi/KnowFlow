@@ -381,9 +381,9 @@
         <div
           className="update-banner"
           key={"token-" + r.key}
-          style={{ background: "var(--err-tint)", borderColor: "#fecaca" }}
+          style={{ background: "var(--err-tint)", borderColor: "rgba(239,68,68,.35)" }}
         >
-          <i className="bi bi-key" style={{ fontSize: 18, color: "#b91c1c" }}></i>
+          <i className="bi bi-key" style={{ fontSize: 18, color: "var(--err-ink)" }}></i>
           <div style={{ flex: 1 }}>{text}</div>
         </div>,
       );

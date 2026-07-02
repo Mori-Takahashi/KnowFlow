@@ -2,6 +2,20 @@ function Home() {
   const { HEALTH, ACTIVITY, STATS, THROUGHPUT, FUNNEL, LAST_UPDATE } = window.KNOWFLOW_DATA;
   window.useLiveData();
 
+  // Sichtbares Pending-Feedback für die beiden Kopf-Aktionen.
+  const [reloading, setReloading] = React.useState(false);
+  const [syncing, setSyncing] = React.useState(false);
+  const doReload = async () => {
+    if (!window.KNOWFLOW_FULL_RELOAD || reloading) return;
+    setReloading(true);
+    try { await window.KNOWFLOW_FULL_RELOAD(); } finally { setReloading(false); }
+  };
+  const doSync = async () => {
+    if (!window.KNOWFLOW_MANUAL_SYNC || syncing) return;
+    setSyncing(true);
+    try { await window.KNOWFLOW_MANUAL_SYNC(); } finally { setSyncing(false); }
+  };
+
   const ageLabel = (() => {
     if (!LAST_UPDATE) return "noch nicht aktualisiert";
     const sec = Math.max(0, Math.floor((Date.now() - LAST_UPDATE) / 1000));
@@ -43,11 +57,11 @@ function Home() {
           <p className="page-sub">Systemstatus und Pipeline-Übersicht · aktualisiert {ageLabel}</p>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button className="btn-ghost" onClick={() => window.KNOWFLOW_FULL_RELOAD && window.KNOWFLOW_FULL_RELOAD()}>
-            <i className="bi bi-arrow-clockwise"></i>Aktualisieren
+          <button className="btn-ghost" onClick={doReload} disabled={reloading}>
+            {reloading ? <Spinner /> : <i className="bi bi-arrow-clockwise"></i>}Aktualisieren
           </button>
-          <button className="btn-primary-x" onClick={() => window.KNOWFLOW_MANUAL_SYNC && window.KNOWFLOW_MANUAL_SYNC()}>
-            <i className="bi bi-lightning-charge-fill"></i>Manuell synchronisieren
+          <button className="btn-primary-x" onClick={doSync} disabled={syncing}>
+            {syncing ? <Spinner /> : <i className="bi bi-lightning-charge-fill"></i>}Manuell synchronisieren
           </button>
         </div>
       </div>
@@ -92,7 +106,7 @@ function Home() {
       </div>
 
       {/* Two-column: chart + activity */}
-      <div style={{display:"grid", gridTemplateColumns:"1.4fr 1fr", gap:16, marginBottom:20}}>
+      <div className="two-col">
         <div className="card-x">
           <div className="card-head">
             <h6>Durchsatz · letzte 7 Tage</h6>

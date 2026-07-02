@@ -227,11 +227,11 @@ function Drawer({ ticket, onClose, onRetry }) {
               <h6>Hinweis</h6>
               <div style={{
                 background:"var(--rework-tint)",
-                border:"1px solid #ddd6fe",
+                border:"1px solid rgba(139,92,246,.35)",
                 borderRadius:8,
                 padding:"12px 14px",
                 fontSize:13,
-                color:"#5b21b6",
+                color:"var(--rework-ink)",
                 lineHeight:1.5
               }}>
                 <i className="bi bi-info-circle" style={{marginRight:6}}></i>
@@ -247,11 +247,11 @@ function Drawer({ ticket, onClose, onRetry }) {
               <h6>Fehlerdetails</h6>
               <div style={{
                 background:"var(--err-tint)",
-                border:"1px solid #fecaca",
+                border:"1px solid rgba(239,68,68,.35)",
                 borderRadius:8,
                 padding:"12px 14px",
                 fontSize:12.5,
-                color:"#991b1b",
+                color:"var(--err-ink)",
                 fontFamily:"'JetBrains Mono', monospace",
                 lineHeight:1.55,
                 whiteSpace:"pre-wrap"
@@ -293,11 +293,11 @@ function Drawer({ ticket, onClose, onRetry }) {
             {lcMsg && (
               <div style={{
                 background: lcMsg.kind === "err" ? "var(--err-tint)" : "var(--ok-tint)",
-                border: "1px solid " + (lcMsg.kind === "err" ? "#fecaca" : "#a7f3d0"),
+                border: "1px solid " + (lcMsg.kind === "err" ? "rgba(239,68,68,.35)" : "rgba(16,185,129,.32)"),
                 borderRadius: 8,
                 padding: "8px 12px",
                 fontSize: 12.5,
-                color: lcMsg.kind === "err" ? "#991b1b" : "#065f46",
+                color: lcMsg.kind === "err" ? "var(--err-ink)" : "var(--ok-ink)",
                 marginBottom: 10
               }}>{lcMsg.text}</div>
             )}

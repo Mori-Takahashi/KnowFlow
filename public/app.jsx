@@ -45,6 +45,10 @@ function App() {
   const initialDeepLink = React.useMemo(() => readDeepLinkTicket(), []);
   const [active, setActive] = React.useState(initialDeepLink ? "tickets" : "home");
 
+  // Mobile: Off-Canvas-Sidebar (Hamburger in der Topbar öffnet, Scrim/Navigation schließt).
+  const [navOpen, setNavOpen] = React.useState(false);
+  const closeNav = React.useCallback(() => setNavOpen(false), []);
+
   // Ersteinrichtung: Beim allerersten Start (noch kein Admin-Passwort) liefert
   // /api/setup/status required=true und wir zeigen den Setup-Assistenten statt
   // des Dashboards. null = noch unbekannt (kurzer Moment vor der Antwort).
@@ -106,9 +110,9 @@ function App() {
 
   const counts = { tickets: window.KNOWFLOW_DATA.TICKETS_TOTAL || window.KNOWFLOW_DATA.TICKETS.length };
 
-  // Gate: solange der Setup-Status unbekannt ist, nichts rendern; ist die
-  // Ersteinrichtung erforderlich, den Vollbild-Assistenten statt der Shell zeigen.
-  if (setupRequired === null || access === null) return null;
+  // Gate: solange der Setup-Status unbekannt ist, eine Ladeanzeige zeigen; ist
+  // die Ersteinrichtung erforderlich, den Vollbild-Assistenten statt der Shell zeigen.
+  if (setupRequired === null || access === null) return <LoadingScreen />;
   if (setupRequired) {
     return <SetupWizard onComplete={() => setSetupRequired(false)} />;
   }
@@ -124,6 +128,10 @@ function App() {
       />
     );
   }
+
+  // Erste Daten noch unterwegs: Ladeanzeige statt eines leeren Dashboards.
+  // loadAll() setzt READY auch bei Fehlern, hängen bleiben kann das hier nicht.
+  if (!window.KNOWFLOW_DATA.READY) return <LoadingScreen />;
 
   let view;
   if (active === "home") view = <Home />;
@@ -146,10 +154,31 @@ function App() {
 
   return (
     <div className="shell">
-      <Sidebar active={active} setActive={setActive} counts={counts} access={access} quickChatEnabled={quickChatEnabled} onLogout={onLogout} />
+      {/* Nur auf kleinen Bildschirmen sichtbar (CSS blendet sie ≤900px ein) */}
+      <header className="topbar">
+        <button
+          className="topbar-burger"
+          onClick={() => setNavOpen(true)}
+          aria-label="Navigation öffnen"
+          aria-expanded={navOpen}
+        >
+          <i className="bi bi-list"></i>
+        </button>
+        <div className="topbar-brand">
+          <span className="brand-mark"><BrandMark size={16} /></span>
+          KnowFlow
+        </div>
+        <ThemeToggle />
+      </header>
+      <div className={"sidebar-scrim" + (navOpen ? " open" : "")} onClick={closeNav}></div>
+      <Sidebar active={active} setActive={setActive} counts={counts} access={access} quickChatEnabled={quickChatEnabled} onLogout={onLogout} open={navOpen} onClose={closeNav} />
       <main className="main" data-screen-label={"Tab · " + active}>
         {window.VersionNotices && <VersionNotices />}
-        {view}
+        {/* key={active} remountet nur beim Tab-Wechsel — Live-Updates über
+            Socket.IO behalten den Key und spielen die Animation nicht erneut ab. */}
+        <div className="view-anim" key={active}>
+          {view}
+        </div>
       </main>
     </div>
   );

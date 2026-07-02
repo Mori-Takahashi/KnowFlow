@@ -94,7 +94,7 @@ function Mcp() {
       </div>
 
       {error && (
-        <div style={{ background: "var(--err-tint)", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#991b1b" }}>
+        <div style={{ background: "var(--err-tint)", border: "1px solid rgba(239,68,68,.35)", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "var(--err-ink)" }}>
           Verbindungen konnten nicht geladen werden: {error}
         </div>
       )}

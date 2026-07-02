@@ -76,15 +76,11 @@ function Field({ label, value, onChange, type = "text", placeholder, disabled })
 
 function Banner({ kind, children }) {
   if (!children) return null;
-  const styles = {
-    ok: { bg: "var(--ok-tint)", bd: "#a7f3d0", fg: "#065f46", icon: "bi-check-circle" },
-    err: { bg: "var(--err-tint)", bd: "#fecaca", fg: "#991b1b", icon: "bi-exclamation-octagon" },
-    info: { bg: "var(--brand-tint)", bd: "#c7d2fe", fg: "#3730a3", icon: "bi-info-circle" },
-  };
-  const s = styles[kind] || styles.info;
+  const icons = { ok: "bi-check-circle", err: "bi-exclamation-octagon", info: "bi-info-circle" };
+  const k = icons[kind] ? kind : "info";
   return (
-    <div style={{ background: s.bg, border: "1px solid " + s.bd, borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: s.fg, display: "flex", alignItems: "center", gap: 8 }}>
-      <i className={"bi " + s.icon}></i>
+    <div className={"banner-x " + k}>
+      <i className={"bi " + icons[k]}></i>
       <div>{children}</div>
     </div>
   );
@@ -132,7 +128,7 @@ function AdminLogin({ onSuccess }) {
           />
           <button className="btn-primary-x" disabled={busy || !password} onClick={submit}
             onKeyDown={(e) => { if (e.key === "Enter") submit(); }}>
-            <i className="bi bi-box-arrow-in-right"></i>{busy ? "Anmelden..." : "Anmelden"}
+            {busy ? <Spinner /> : <i className="bi bi-box-arrow-in-right"></i>}{busy ? "Anmelden..." : "Anmelden"}
           </button>
         </div>
       </div>
@@ -173,7 +169,7 @@ function LockScreen({ onSuccess, userLoginEnabled }) {
     }}>
       <div style={{ width: "100%", maxWidth: 400 }}>
         <div style={{ textAlign: "center", marginBottom: 22 }}>
-          <div className="brand-mark" style={{ margin: "0 auto 12px", width: 48, height: 48, fontSize: 18 }}>JB</div>
+          <div className="brand-mark" style={{ margin: "0 auto 12px", width: 48, height: 48 }}><BrandMark size={26} /></div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--ink, #e2e8f0)", margin: 0 }}>KnowFlow</h1>
           <p style={{ fontSize: 13, color: "var(--muted, #94a3b8)", marginTop: 6 }}>
             <i className="bi bi-lock-fill" style={{ marginRight: 6 }}></i>
@@ -192,7 +188,7 @@ function LockScreen({ onSuccess, userLoginEnabled }) {
             />
             <button className="btn-primary-x" style={{ width: "100%", justifyContent: "center" }}
               disabled={busy || !password} onClick={submit}>
-              <i className="bi bi-box-arrow-in-right"></i>{busy ? "Anmelden..." : "Anmelden"}
+              {busy ? <Spinner /> : <i className="bi bi-box-arrow-in-right"></i>}{busy ? "Anmelden..." : "Anmelden"}
             </button>
           </div>
         </div>
@@ -632,7 +628,7 @@ function AdminQuickChat({ targets }) {
     }
   };
 
-  if (!cfg) return <div className="empty"><i className="bi bi-hourglass"></i><div>Lade...</div></div>;
+  if (!cfg) return <div className="empty"><Spinner size={22} /><div>Lade...</div></div>;
 
   const modelIds = models.map((m) => m.id);
   const extraAllowed = allowedModels.filter((m) => !modelIds.includes(m));
@@ -680,7 +676,7 @@ function AdminQuickChat({ targets }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <div className="k">Erlaubte Modelle</div>
           <button className="btn-ghost" style={{ padding: "5px 10px" }} disabled={!canEdit || loadingModels || !targetId} onClick={loadModels}>
-            <i className="bi bi-arrow-repeat"></i>{loadingModels ? "Lädt..." : "Modelle laden"}
+            {loadingModels ? <Spinner size={12} /> : <i className="bi bi-arrow-repeat"></i>}{loadingModels ? "Lädt..." : "Modelle laden"}
           </button>
         </div>
         {modelsMsg && <Banner kind={modelsMsg.kind}>{modelsMsg.text}</Banner>}
@@ -747,7 +743,7 @@ function AdminFieldMapping({ config, fields, fieldsError, reloadConfig }) {
             <select
               value={mappings[lf] || ""}
               onChange={(e) => set(lf, e.target.value)}
-              style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, background: "#fff" }}
+              style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}
             >
               <option value="">— nicht zugeordnet —</option>
               {(fields || []).map((f) => (
@@ -931,7 +927,7 @@ function RuleEditor({ rule, config, targets, mcpConnections, onSaved, onCancel }
 
       <div className="k" style={{ marginBottom: 6 }}>Bedingungen (alle müssen zutreffen)</div>
       {conditions.map((c, i) => (
-        <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.2fr auto", gap: 6, marginBottom: 6, alignItems: "center" }}>
+        <div key={i} className="rule-row">
           <select value={c.field} onChange={(e) => setCond(i, { field: e.target.value })} style={{ padding: "8px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 12.5 }}>
             {fields.map((f) => <option key={f} value={f}>{LOGICAL_FIELD_LABELS[f] || f}</option>)}
           </select>
@@ -955,7 +951,7 @@ function RuleEditor({ rule, config, targets, mcpConnections, onSaved, onCancel }
         Trifft das hier zu, wird die Regel für dieses Ticket übersprungen – so lässt sich z. B. ein einzelnes Label/Tag ausnehmen, ohne alle anderen aufzählen zu müssen. Leer = nichts wird ignoriert.
       </p>
       {ignoreConditions.map((c, i) => (
-        <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.2fr auto", gap: 6, marginBottom: 6, alignItems: "center" }}>
+        <div key={i} className="rule-row">
           <select value={c.field} onChange={(e) => setIgnoreCond(i, { field: e.target.value })} style={{ padding: "8px", border: "1px solid var(--border)", borderRadius: 7, fontSize: 12.5 }}>
             {fields.map((f) => <option key={f} value={f}>{LOGICAL_FIELD_LABELS[f] || f}</option>)}
           </select>
@@ -978,7 +974,7 @@ function RuleEditor({ rule, config, targets, mcpConnections, onSaved, onCancel }
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         {targets.length === 0 && <span style={{ fontSize: 12, color: "var(--muted)" }}>Zuerst Wissensbasen anlegen.</span>}
         {targets.map((t) => (
-          <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "5px 10px", border: "1px solid var(--border)", borderRadius: 7, cursor: "pointer", background: targetIds.includes(t.id) ? "#fff" : "transparent" }}>
+          <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "5px 10px", border: "1px solid var(--border)", borderRadius: 7, cursor: "pointer", background: targetIds.includes(t.id) ? "var(--panel)" : "transparent" }}>
             <input type="checkbox" checked={targetIds.includes(t.id)} onChange={() => toggleTarget(t.id)} />{t.name}
           </label>
         ))}
@@ -988,7 +984,7 @@ function RuleEditor({ rule, config, targets, mcpConnections, onSaved, onCancel }
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         {mcps.length === 0 && <span style={{ fontSize: 12, color: "var(--muted)" }}>Keine MCP-Verbindungen verfügbar.</span>}
         {mcps.map((m) => (
-          <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "5px 10px", border: "1px solid var(--border)", borderRadius: 7, cursor: "pointer", background: mcpIds.includes(m.id) ? "#fff" : "transparent" }}>
+          <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "5px 10px", border: "1px solid var(--border)", borderRadius: 7, cursor: "pointer", background: mcpIds.includes(m.id) ? "var(--panel)" : "transparent" }}>
             <input type="checkbox" checked={mcpIds.includes(m.id)} onChange={() => toggleMcp(m.id)} />{m.title}
           </label>
         ))}
@@ -1393,7 +1389,7 @@ function AdminAccess() {
     }
   };
 
-  if (!cfg) return <div className="empty"><i className="bi bi-hourglass"></i><div>Lade...</div></div>;
+  if (!cfg) return <div className="empty"><Spinner size={22} /><div>Lade...</div></div>;
   const perms = cfg.userPermissions || {};
 
   const permRow = (key, label, hint, disabled) => (
@@ -1814,7 +1810,7 @@ function DangerAction({ title, description, buttonLabel, icon, open, onOpen, onC
   };
 
   return (
-    <div style={{ borderTop: "1px solid #fee2e2", padding: "14px 0" }}>
+    <div style={{ borderTop: "1px solid rgba(239,68,68,.2)", padding: "14px 0" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>{title}</div>
@@ -1825,15 +1821,15 @@ function DangerAction({ title, description, buttonLabel, icon, open, onOpen, onC
         </button>
       </div>
       {open && (
-        <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--err-tint)", border: "1px solid #fecaca", borderRadius: 8 }}>
-          <div style={{ fontSize: 12.5, color: "#991b1b", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--err-tint)", border: "1px solid rgba(239,68,68,.35)", borderRadius: 8 }}>
+          <div style={{ fontSize: 12.5, color: "var(--err-ink)", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
             <i className="bi bi-exclamation-triangle-fill"></i>
             <span>Diese Aktion kann nicht rückgängig gemacht werden. Bitte mit dem Admin-Passwort bestätigen.</span>
           </div>
           <Field label="Admin-Passwort zur Bestätigung" type="password" value={password} onChange={setPassword} placeholder="Admin-Passwort" />
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn-danger-x" disabled={busy || !password} onClick={confirm}>
-              <i className="bi bi-trash3"></i>{busy ? "Wird ausgeführt..." : "Endgültig ausführen"}
+              {busy ? <Spinner /> : <i className="bi bi-trash3"></i>}{busy ? "Wird ausgeführt..." : "Endgültig ausführen"}
             </button>
             <button className="btn-ghost" disabled={busy} onClick={cancel}>Abbrechen</button>
           </div>
@@ -1948,20 +1944,20 @@ function AdminDangerZone({ reloadConfig, reloadTargets, reloadRules }) {
             </span>
             {ingestEnabled ? (
               <button className="btn-danger-x" disabled={toggleBusy} onClick={toggleIngest}>
-                <i className="bi bi-pause-circle"></i>{toggleBusy ? "..." : "Verarbeitung pausieren"}
+                {toggleBusy ? <Spinner /> : <i className="bi bi-pause-circle"></i>}{toggleBusy ? "Wird pausiert..." : "Verarbeitung pausieren"}
               </button>
             ) : (
               <button className="btn-primary-x" disabled={toggleBusy} onClick={toggleIngest}>
-                <i className="bi bi-play-circle"></i>{toggleBusy ? "..." : "Verarbeitung aktivieren"}
+                {toggleBusy ? <Spinner /> : <i className="bi bi-play-circle"></i>}{toggleBusy ? "Wird aktiviert..." : "Verarbeitung aktivieren"}
               </button>
             )}
           </div>
         </div>
       </div>
 
-      <div className="card-x" style={{ border: "1px solid #fecaca" }}>
-        <div className="card-head" style={{ borderBottom: "1px solid #fee2e2" }}>
-          <h6 style={{ color: "#b91c1c" }}><i className="bi bi-exclamation-triangle" style={{ marginRight: 6 }}></i>Danger Zone</h6>
+      <div className="card-x" style={{ border: "1px solid rgba(239,68,68,.35)" }}>
+        <div className="card-head" style={{ borderBottom: "1px solid rgba(239,68,68,.2)" }}>
+          <h6 style={{ color: "var(--err-ink)" }}><i className="bi bi-exclamation-triangle" style={{ marginRight: 6 }}></i>Danger Zone</h6>
         </div>
         <div className="card-body-x" style={{ paddingTop: 0 }}>
           <DangerAction
@@ -2097,7 +2093,7 @@ function AdminPanel({ role, permissions, onLogout }) {
     );
   }
   if (!config) {
-    return <div className="empty"><i className="bi bi-hourglass"></i><div>Lade Konfiguration...</div></div>;
+    return <div className="empty"><Spinner size={22} /><div>Lade Konfiguration...</div></div>;
   }
 
   return (
@@ -2162,7 +2158,7 @@ function Admin() {
   };
 
   if (session === undefined) {
-    return <div className="empty"><i className="bi bi-hourglass"></i><div>Prüfe Sitzung...</div></div>;
+    return <div className="empty"><Spinner size={22} /><div>Prüfe Sitzung...</div></div>;
   }
   if (!session.authenticated) {
     return <AdminLogin onSuccess={onAuthChanged} />;
