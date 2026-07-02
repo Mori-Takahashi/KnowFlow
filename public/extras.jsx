@@ -5,6 +5,12 @@ function Knowledge() {
   window.useLiveData();
   const docs = window.KNOWFLOW_DATA.KNOWLEDGE_DOCS || [];
   const [sel, setSel] = React.useState(null);
+  const [resyncing, setResyncing] = React.useState(false);
+  const doResync = async () => {
+    if (!window.KNOWFLOW_FULL_RELOAD || resyncing) return;
+    setResyncing(true);
+    try { await window.KNOWFLOW_FULL_RELOAD(); } finally { setResyncing(false); }
+  };
 
   React.useEffect(() => {
     if (!sel && docs.length > 0) setSel(docs[0].id);
@@ -23,13 +29,13 @@ function Knowledge() {
           <p className="page-sub">{docs.length} aktive Markdown-Dokumente · synchronisiert mit OpenWebUI</p>
         </div>
         <div style={{display:"flex", gap:8}}>
-          <button className="btn-ghost" onClick={() => window.KNOWFLOW_FULL_RELOAD && window.KNOWFLOW_FULL_RELOAD()}>
-            <i className="bi bi-arrow-repeat"></i>Resync
+          <button className="btn-ghost" onClick={doResync} disabled={resyncing}>
+            {resyncing ? <Spinner /> : <i className="bi bi-arrow-repeat"></i>}Resync
           </button>
         </div>
       </div>
 
-      <div className="stat-grid" style={{gridTemplateColumns:"repeat(4, 1fr)"}}>
+      <div className="stat-grid">
         <div className="stat-tile"><div className="lbl"><i className="bi bi-file-earmark-text"></i>Dokumente</div><div className="num">{docs.length}</div><div className="delta">aktuell synchronisiert</div></div>
         <div className="stat-tile"><div className="lbl"><i className="bi bi-hdd"></i>Gesamtgröße</div><div className="num">{totalMb} MB</div><div className="delta">Ø {avgKb} KB / Doc</div></div>
         <div className="stat-tile"><div className="lbl"><i className="bi bi-stack"></i>Quelle</div><div className="num">Jira</div><div className="delta">über Webhook</div></div>
@@ -42,7 +48,7 @@ function Knowledge() {
           <div>Noch keine Dokumente in der Wissensbasis. Sobald ein Ticket auf Done wechselt, erscheint hier das generierte Markdown.</div>
         </div>
       ) : (
-        <div style={{display:"grid", gridTemplateColumns:"360px 1fr", gap:16}}>
+        <div className="docs-grid">
           {/* Doc list */}
           <div className="card-x">
             <div className="card-head">
@@ -171,11 +177,11 @@ function Logs() {
           </h6>
           <span className="mono" style={{fontSize:11,color:"#64748b"}}>Socket.IO + lokaler Puffer</span>
         </div>
-        <div style={{background:"#0f1729", padding:"14px 20px", maxHeight:520, overflowY:"auto", fontFamily:"'JetBrains Mono', monospace", fontSize:12, lineHeight:1.65, color:"#cbd5e1"}}>
+        <div className="log-scroll" style={{background:"#0f1729", padding:"14px 20px", maxHeight:520, overflowY:"auto", fontFamily:"'JetBrains Mono', monospace", fontSize:12, lineHeight:1.65, color:"#cbd5e1"}}>
           {filtered.length === 0 ? (
             <div style={{color:"#64748b"}}>Noch keine Log-Zeilen. Warten auf den ersten Workflow-Lauf.</div>
           ) : filtered.map((l, i) => (
-            <div key={i} style={{display:"grid", gridTemplateColumns:"96px 60px 90px 1fr", gap:14, padding:"2px 0"}}>
+            <div key={i} className="log-row" style={{display:"grid", gridTemplateColumns:"96px 60px 90px 1fr", gap:14, padding:"2px 0"}}>
               <span style={{color:"#64748b"}}>{l.t}</span>
               <span style={{color: lvlColor[l.lvl] || "#cbd5e1", fontWeight:600}}>{l.lvl}</span>
               <span style={{color:"#a5b4fc"}}>[{l.src}]</span>
@@ -400,9 +406,9 @@ function Debug() {
         alignItems:"center",
         gap:10,
         fontSize:13,
-        color:"#92400e"
+        color:"var(--warn-ink)"
       }}>
-        <i className="bi bi-exclamation-triangle-fill" style={{fontSize:16, color:"#d97706"}}></i>
+        <i className="bi bi-exclamation-triangle-fill" style={{fontSize:16, color:"var(--warn)"}}></i>
         <div>
           <b>UI-Debug-Modus aktiv.</b> Alle Aktionen hier sind reine Simulationen und greifen
           auf keine echten Jira- oder OpenWebUI-APIs zu. Dieser Tab erscheint nur, wenn der Server
@@ -413,12 +419,12 @@ function Debug() {
       {lastAction && (
         <div style={{
           background:"var(--brand-tint)",
-          border:"1px solid #c7d2fe",
+          border:"1px solid rgba(99,102,241,.35)",
           borderRadius:8,
           padding:"10px 14px",
           marginBottom:16,
           fontSize:13,
-          color:"#3730a3",
+          color:"var(--info-ink)",
           display:"flex",
           alignItems:"center",
           gap:8
@@ -431,7 +437,7 @@ function Debug() {
       <div className="card-x" style={{marginBottom:16}}>
         <div className="card-head"><h6>Schnellszenarien</h6><span style={{fontSize:12,color:"var(--muted)"}}>1 Klick</span></div>
         <div className="card-body-x">
-          <div style={{display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:10}}>
+          <div className="two-col-even">
             {scenarios.map((s, i) => (
               <button key={i} className="btn-ghost" style={{justifyContent:"flex-start", padding:"12px 14px"}} onClick={() => runSimulation(s.opts)}>
                 <i className={"bi " + s.icon} style={{fontSize:16}}></i>
@@ -474,7 +480,7 @@ function Debug() {
             </div>
           </div>
 
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16}}>
+          <div className="two-col-even" style={{marginBottom:16}}>
             <div>
               <div className="k" style={{marginBottom:6}}>Ticket-ID (optional)</div>
               <input
@@ -542,7 +548,7 @@ function Debug() {
                           fontWeight:600,
                           cursor:"pointer",
                           border: "1px solid " + (current === b.id ? b.color : "var(--border)"),
-                          background: current === b.id ? b.color : "#fff",
+                          background: current === b.id ? b.color : "var(--panel)",
                           color: current === b.id ? "#fff" : "var(--ink-2)"
                         }}
                       >{b.label}</button>
@@ -550,7 +556,7 @@ function Debug() {
                     <button
                       onClick={() => setHealth(svc.id, null)}
                       title="Override entfernen"
-                      style={{padding:"5px 10px", borderRadius:7, fontSize:12, cursor:"pointer", border:"1px solid var(--border)", background:"#fff", color:"var(--muted)"}}
+                      style={{padding:"5px 10px", borderRadius:7, fontSize:12, cursor:"pointer", border:"1px solid var(--border)", background:"var(--panel)", color:"var(--muted)"}}
                     ><i className="bi bi-x-lg"></i></button>
                   </div>
                 </div>

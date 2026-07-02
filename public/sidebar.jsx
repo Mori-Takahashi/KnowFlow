@@ -1,4 +1,4 @@
-function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout }) {
+function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout, open, onClose }) {
   const items = [
     { id: "home", label: "Startseite", icon: "bi-house-door" },
     { id: "tickets", label: "Tickets", icon: "bi-ticket-perforated", badge: counts.tickets },
@@ -19,10 +19,23 @@ function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout
     { id: "admin", label: "Einstellungen", icon: "bi-shield-lock" },
   ];
 
+  // Mobil: Escape schließt die geöffnete Off-Canvas-Sidebar.
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (e.key === "Escape" && onClose) onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  const navigate = (id) => {
+    setActive(id);
+    if (onClose) onClose();
+  };
+
   return (
-    <aside className="sidebar">
+    <aside className={"sidebar" + (open ? " open" : "")}>
       <div className="brand-row">
-        <div className="brand-mark">JB</div>
+        <div className="brand-mark"><BrandMark size={18} /></div>
         <div>
           <div className="brand-name">KnowFlow</div>
           <div className="brand-sub">Knowledge Pipeline</div>
@@ -34,7 +47,7 @@ function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout
         <button
           key={it.id}
           className={"nav-item " + (active === it.id ? "active" : "")}
-          onClick={() => setActive(it.id)}
+          onClick={() => navigate(it.id)}
         >
           <i className={"bi " + it.icon}></i>
           <span>{it.label}</span>
@@ -47,7 +60,7 @@ function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout
         <button
           key={it.id}
           className={"nav-item " + (active === it.id ? "active" : "")}
-          onClick={() => setActive(it.id)}
+          onClick={() => navigate(it.id)}
         >
           <i className={"bi " + it.icon}></i>
           <span>{it.label}</span>
@@ -55,44 +68,18 @@ function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout
       ))}
 
       {window.KNOWFLOW_DEBUG_ENABLED && (
-        <div style={{
-          margin:"10px 12px 0",
-          padding:"7px 10px",
-          borderRadius:8,
-          background:"rgba(251,191,36,.12)",
-          border:"1px solid rgba(251,191,36,.35)",
-          color:"#fbbf24",
-          fontSize:11.5,
-          fontWeight:600,
-          display:"flex",
-          alignItems:"center",
-          gap:7
-        }}>
+        <div className="sidebar-note">
           <i className="bi bi-bug-fill"></i>Debug-Modus aktiv
         </div>
       )}
 
       {access && access.authenticated && (
-        <div style={{
-          margin:"10px 12px 0",
-          padding:"8px 10px",
-          borderRadius:8,
-          background:"rgba(148,163,184,.12)",
-          border:"1px solid rgba(148,163,184,.25)",
-          display:"flex",
-          alignItems:"center",
-          gap:8,
-          fontSize:11.5
-        }}>
-          <i className={"bi " + (access.role === "admin" ? "bi-shield-check" : "bi-person-badge")} style={{color:"#cbd5e1"}}></i>
-          <span style={{color:"#cbd5e1",fontWeight:600,flex:1}}>
+        <div className="sidebar-user">
+          <i className={"bi " + (access.role === "admin" ? "bi-shield-check" : "bi-person-badge")}></i>
+          <span className="role">
             {access.role === "admin" ? "Admin" : "Benutzer"}
           </span>
-          <button
-            onClick={onLogout}
-            title="Abmelden"
-            style={{background:"transparent",border:"none",color:"#94a3b8",cursor:"pointer",padding:0,fontSize:14}}
-          >
+          <button onClick={onLogout} title="Abmelden" className="logout-btn">
             <i className="bi bi-box-arrow-right"></i>
           </button>
         </div>
@@ -100,10 +87,11 @@ function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout
 
       <div className="sidebar-footer">
         <div className="foot-dot"></div>
-        <div>
-          <div style={{color:"#cbd5e1",fontWeight:500}}>Alle Systeme</div>
-          <div style={{fontSize:11,marginTop:1}}>betriebsbereit</div>
+        <div style={{flex:1}}>
+          <div className="sidebar-foot-text">Alle Systeme</div>
+          <div className="sidebar-foot-sub">betriebsbereit</div>
         </div>
+        <ThemeToggle />
       </div>
     </aside>
   );

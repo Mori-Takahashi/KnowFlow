@@ -281,7 +281,7 @@ function SetupWizard({ onComplete }) {
   if (step === STEP_WELCOME) {
     body = (
       <div className="setup-step setup-step-center" key="welcome">
-        <div className="setup-logo">JB</div>
+        <div className="setup-logo"><BrandMark size={30} /></div>
         <h2 className="setup-title">Willkommen beim KnowFlow</h2>
         <p className="setup-lead">
           Lass uns deinen Bot in wenigen Schritten startklar machen. Alles lässt
@@ -614,7 +614,7 @@ function SetupWizard({ onComplete }) {
     <div className="setup-screen">
       <div className="setup-card">
         <div className="setup-header">
-          <div className="brand-mark setup-brand-mark">JB</div>
+          <div className="brand-mark setup-brand-mark"><BrandMark size={15} /></div>
           <div className="setup-header-text">KnowFlow · Ersteinrichtung</div>
         </div>
 
@@ -642,7 +642,7 @@ function SetupWizard({ onComplete }) {
               </button>
             )}
             <button className="btn-primary-x setup-primary" disabled={primaryDisabled} onClick={primaryAction}>
-              {(step === STEP_SUMMARY || step === STEP_PIN) && busy && <i className="bi bi-arrow-repeat setup-spin"></i>}
+              {(step === STEP_SUMMARY || step === STEP_PIN) && busy && <Spinner />}
               {primaryLabel}
               {step !== STEP_SUMMARY && step !== STEP_DONE && step !== STEP_PIN && <i className="bi bi-arrow-right"></i>}
               {step === STEP_DONE && <i className="bi bi-box-arrow-in-right"></i>}

@@ -4,6 +4,23 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>KnowFlow · Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+
+<!-- Theme vor dem ersten Paint setzen (verhindert Aufblitzen des falschen Themes).
+     Muss vor den Stylesheets stehen. -->
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('knowflow-theme');
+    if (t !== 'light' && t !== 'dark') {
+      t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    var d = document.documentElement;
+    d.dataset.theme = t;
+    d.dataset.bsTheme = t;
+  } catch (e) { /* Standard: hell */ }
+})();
+</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -22,6 +39,7 @@
 <div id="root"></div>
 
 <script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
 <script type="text/babel" src="version.jsx"></script>
 <script type="text/babel" src="sidebar.jsx"></script>
 <script type="text/babel" src="home.jsx"></script>
