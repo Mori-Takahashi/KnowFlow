@@ -9,6 +9,18 @@ Das Format orientiert sich an
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-02
+
+### Added
+
+- **Kompletter UI-Refresh**: Das Dashboard erhielt einen neuen, modernen Stil mit
+  responsivem Layout, hellem und dunklem Theme sowie einem frischen Favicon.
+
+### Fixed
+
+- **Schneller Chat nach Login sofort sichtbar**: Der QuickChat wird nach dem Login
+  nun direkt angezeigt, ohne dass die Seite neu geladen werden muss.
+
 ## [1.4.0] - 2026-07-01
 
 ### Added
