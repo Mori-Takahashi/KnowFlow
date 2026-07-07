@@ -50,8 +50,6 @@ allein aktiv. Sie müssen **nichts** tun – kein Knopfdruck, kein Kopieren.
 Zusätzlich schreibt der KnowFlow einen **Kommentar zurück ins Jira-Ticket** – als
 Bestätigung, dass die Lösung gesichert wurde, inklusive Link zum Dashboard.
 
-> _(Screenshot: Ablauf-Animation der drei Pipeline-Schritte auf der Startseite)_
-
 ---
 
 ## Das Dashboard im Überblick
@@ -60,7 +58,7 @@ Der KnowFlow hat eine eigene Internet-Oberfläche – das **Dashboard**. Hier se
 Sie in Echtzeit, was gerade passiert. Über die **Seitenleiste links** wechseln
 Sie zwischen den Bereichen.
 
-> _(Screenshot: Gesamtansicht des Dashboards mit Seitenleiste und Startseite)_
+![Gesamtansicht des Dashboards mit Seitenleiste und Startseite](docs/screenshots/startseite.png)
 
 Die Seitenleiste ist in zwei Gruppen geteilt:
 
@@ -85,8 +83,6 @@ Ihr zentraler Überblick. Auf einen Blick sehen Sie:
 - **Systemstatus** – ob alle beteiligten Dienste (Jira, Wissensdatenbank)
   erreichbar sind.
 
-> _(Screenshot: Startseite mit Kennzahlen-Kacheln und Durchsatz-Diagramm)_
-
 ---
 
 ### 🎫 Tickets
@@ -107,7 +103,9 @@ In der Detailansicht sehen Sie das erzeugte Wissensdokument, die Anhänge und de
 > ℹ️ Die Lebenszyklus-Aktionen sind geschützt – man muss zuerst in den
 > **Einstellungen** angemeldet sein.
 
-> _(Screenshot: Ticket-Liste links, Detailansicht mit Markdown-Vorschau rechts)_
+![Ticket-Liste mit Pipeline-Status](docs/screenshots/tickets.png)
+
+![Detailansicht mit Workflow und Markdown-Vorschau](docs/screenshots/ticket-detail.png)
 
 ---
 
@@ -118,7 +116,7 @@ Schritt war erfolgreich, wo gab es eine Warnung oder einen Fehler. Mit Filtern
 nach **Erfolgreich, Info, Warnung, Fehler** und **Überarbeitung** behalten Sie
 den Überblick.
 
-> _(Screenshot: Aktivitäts-Zeitleiste mit farbigen Status-Symbolen)_
+![Aktivitäts-Zeitleiste mit farbigen Status-Symbolen](docs/screenshots/aktivitaet.png)
 
 ---
 
@@ -128,7 +126,7 @@ Hier sehen Sie **alle fertigen Wissensartikel**, die der KnowFlow erzeugt hat.
 Links die Liste der Dokumente, rechts eine **Vorschau** des ausgewählten
 Artikels. Oben stehen Kennzahlen wie Anzahl und Gesamtgröße der Dokumente.
 
-> _(Screenshot: Wissensbasis mit Dokumentliste und Markdown-Vorschau)_
+![Wissensbasis mit Dokumentliste und Markdown-Vorschau](docs/screenshots/wissensbasis.png)
 
 ---
 
@@ -139,7 +137,7 @@ auf das gesammelte Wissen zugreifen. Hier kopieren Sie die Verbindungs-Adresse
 und sehen, welches Wissen jede Verbindung enthält. → Mehr dazu im Abschnitt
 [Der MCP-Server](#-besondere-funktion-der-mcp-server).
 
-> _(Screenshot: MCP-Übersicht mit kopierbaren Verbindungs-Adressen)_
+![MCP-Übersicht mit kopierbaren Verbindungs-Adressen](docs/screenshots/mcp.png)
 
 ---
 
@@ -149,7 +147,7 @@ Ein **Live-Mitschnitt** der technischen Meldungen des Dienstes – nützlich, we
 einmal etwas nicht klappt. Man kann nach Wichtigkeit (Info, Warnung, Fehler)
 filtern, den Stream pausieren und die Protokolle als Datei exportieren.
 
-> _(Screenshot: Log-Ansicht im dunklen Terminal-Stil)_
+![Log-Ansicht im dunklen Terminal-Stil](docs/screenshots/logs.png)
 
 ---
 
@@ -159,7 +157,7 @@ Der Bereich **Einstellungen** ist **passwortgeschützt** und richtet sich an die
 Person, die den KnowFlow betreut. Hier wird alles eingerichtet und angepasst.
 Oben wechselt man über Reiter (Tabs) zwischen den Themen.
 
-> _(Screenshot: Anmeldemaske der Einstellungen)_
+![Anmeldemaske der Einstellungen](docs/screenshots/anmeldung.png)
 
 | Tab | Wofür er da ist |
 |---|---|
@@ -175,7 +173,7 @@ Oben wechselt man über Reiter (Tabs) zwischen den Themen.
 > ⚠️ **Danger Zone:** Aktionen hier sind – bis auf die Webhook-Pause – **nicht
 > umkehrbar**. Bitte mit Bedacht nutzen.
 
-> _(Screenshot: Einstellungen mit den Tab-Reitern und der Routing-Regel-Ansicht)_
+![Einstellungen mit den Tab-Reitern](docs/screenshots/admin-einstellungen.png)
 
 ---
 
@@ -207,9 +205,6 @@ internen Assistenten das gesamte Wissen – ganz nach Bedarf.
 
 > ℹ️ Wird ein Ticket als veraltet markiert oder gelöscht, verschwindet es auch
 > automatisch aus den MCP-Verbindungen. Das Wissen bleibt also immer aktuell.
-
-> _(Screenshot: MCP-Tab in den Einstellungen mit Titel und Beschreibung je
-> Verbindung)_
 
 ---
 
@@ -254,4 +249,4 @@ geschützten **Einstellungen**. Danach läuft alles automatisch.
 
 > 📄 _Diese Seite beschreibt den KnowFlow aus Anwendersicht. Technische Details,
 > die Installation und alle Konfigurations-Variablen finden technische Nutzer in
-> der `README.md` im Projekt._
+> der [technischen Dokumentation](docs/TECHNIK.md)._
