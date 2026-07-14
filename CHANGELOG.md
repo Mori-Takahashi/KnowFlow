@@ -9,6 +9,24 @@ Das Format orientiert sich an
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-14
+
+### Added
+
+- **Schneller Chat (Beta): Quellenangaben & nachvollziehbarer Denkprozess**: Der
+  Schnelle Chat zeigt jetzt zu jeder Antwort die genutzten Quellen an. Jede Quelle
+  erscheint als anklickbarer Chip und verlinkt – sofern es sich um einen Jira-Key
+  handelt – direkt auf das zugehörige Ticket (`<Base-URL>/browse/<JIRA-ID>`), sodass
+  man die Herkunft der Antwort nachlesen kann. Zusätzlich wird der Denkprozess von
+  Reasoning-Modellen sichtbar gemacht: Ein Live-Panel („Denkt nach …") zeigt
+  während der Antwort an, dass das Modell arbeitet und welche Tickets es gerade
+  prüft. Der vollständige Gedankengang lässt sich auf- und zuklappen. Der Schnelle
+  Chat ist als **Beta** gekennzeichnet (Badge im Menü, im Chat-Titel und in den
+  Einstellungen). Die dafür nötige Jira-Basis-URL wird über
+  `/api/quickchat/config` bereitgestellt; `<think>…</think>`-Blöcke sowie
+  `reasoning`/`reasoning_content`-Deltas werden clientseitig aus der Antwort
+  getrennt dargestellt.
+
 ## [1.5.0] - 2026-07-02
 
 ### Added

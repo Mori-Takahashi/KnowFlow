@@ -532,10 +532,14 @@ function createApiRouter({ workflowService, jiraService, openwebuiService, setti
     const target = cfg.targetId ? settingsService.getTarget(cfg.targetId) : null;
     const usable = cfg.enabled && Boolean(target && target.enabled)
       && settingsService.getOpenWebUiMode() === OPENWEBUI_MODE.REAL;
+    // The Jira base URL lets the browser turn a cited "<JIRA-ID>.md" source back
+    // into a clickable link to the original ticket. It is a non-secret config
+    // value, so exposing it to the dashboard is safe.
     res.json({
       enabled: usable,
       models: usable ? cfg.allowedModels : [],
       hasKnowledge: usable && cfg.attachKnowledge && Boolean(target && target.knowledgeId),
+      jiraBaseUrl: usable ? (settingsService.getJiraConfig().baseUrl || '') : '',
     });
   });
 

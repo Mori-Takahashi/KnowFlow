@@ -1660,6 +1660,143 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   40% { opacity: 1; transform: translateY(-2px); }
 }
 
+/* ---------- Schneller Chat: Denkprozess + Quellen ---------- */
+/* An assistant turn groups the thinking panel, the answer bubble and the
+   source chips into one left-aligned column. */
+.chat-turn {
+  align-self: flex-start;
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chat-turn .chat-bubble { max-width: 100%; }
+
+/* Kollabierbarer Denkprozess-Block */
+.qc-think {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-2);
+  overflow: hidden;
+  font-size: 12.5px;
+}
+.qc-think.live {
+  border-color: var(--brand, #6366f1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand, #6366f1) 12%, transparent);
+}
+.qc-think-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+.qc-think-head:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.qc-think-title { font-weight: 600; }
+.qc-think-tickets {
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qc-think-caret { margin-left: auto; color: var(--muted); font-size: 12px; }
+.qc-think-body {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.qc-think-muted { font-style: italic; opacity: .8; }
+.qc-spin { animation: qcSpin 1s linear infinite; display: inline-block; }
+@keyframes qcSpin { to { transform: rotate(360deg); } }
+
+/* Quellen-Chips unter der Antwort */
+.qc-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+.qc-sources-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-right: 2px;
+}
+.qc-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color .15s ease, background .15s ease, transform .05s ease;
+}
+a.qc-source:hover {
+  border-color: var(--brand, #6366f1);
+  background: color-mix(in srgb, var(--brand, #6366f1) 10%, var(--panel));
+}
+a.qc-source:active { transform: scale(.96); }
+.qc-source-ext { font-size: 10px; opacity: .6; }
+.qc-source-static { cursor: default; color: var(--muted); font-weight: 500; }
+
+/* "Beta"-Abzeichen */
+.beta-badge {
+  display: inline-block;
+  margin-left: 9px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--grad-brand, linear-gradient(135deg, #6366f1, #8b5cf6));
+}
+.chip-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--grad-brand, linear-gradient(135deg, #6366f1, #8b5cf6));
+}
+.nav-tag {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--grad-brand, linear-gradient(135deg, #6366f1, #8b5cf6));
+}
+
 /* ---------- Layout-Hilfsklassen (ersetzen Inline-Grids) ---------- */
 .two-col {
   display: grid;
