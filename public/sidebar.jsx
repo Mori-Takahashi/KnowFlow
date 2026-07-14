@@ -9,7 +9,7 @@ function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout
   ];
   // The temporary chat only appears when an admin has enabled it.
   if (quickChatEnabled) {
-    items.splice(4, 0, { id: "chat", label: "Schneller Chat", icon: "bi-chat-dots" });
+    items.splice(4, 0, { id: "chat", label: "Schneller Chat", icon: "bi-chat-dots", tag: "Beta" });
   }
   // Debug entry only appears when the server runs with UI_DEBUG=true.
   if (window.KNOWFLOW_DEBUG_ENABLED) {
@@ -51,6 +51,7 @@ function Sidebar({ active, setActive, counts, access, quickChatEnabled, onLogout
         >
           <i className={"bi " + it.icon}></i>
           <span>{it.label}</span>
+          {it.tag && <span className="nav-tag">{it.tag}</span>}
           {it.badge != null && <span className="nav-badge">{it.badge}</span>}
         </button>
       ))}

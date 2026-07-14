@@ -636,7 +636,7 @@ function AdminQuickChat({ targets }) {
 
   return (
     <div className="card-x">
-      <div className="card-head"><h6>Schneller Chat</h6></div>
+      <div className="card-head"><h6>Schneller Chat<span className="beta-badge">Beta</span></h6></div>
       <div className="card-body-x">
         {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
         <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 0 }}>
@@ -2046,7 +2046,7 @@ function AdminPanel({ role, permissions, onLogout }) {
       { id: "routing", label: "Routing-Regeln", icon: "bi-diagram-3" },
       { id: "mcp", label: "MCP-Verbindungen", icon: "bi-hdd-network" },
       { id: "rag", label: "RAG", icon: "bi-stars" },
-      { id: "quickchat", label: "Schneller Chat", icon: "bi-chat-dots" },
+      { id: "quickchat", label: "Schneller Chat", icon: "bi-chat-dots", tag: "Beta" },
       { id: "markdown", label: "Markdown", icon: "bi-markdown" },
     );
   }
@@ -2117,6 +2117,7 @@ function AdminPanel({ role, permissions, onLogout }) {
           {tabs.map((t) => (
             <button key={t.id} className={"chip " + (activeTab === t.id ? "active" : "")} onClick={() => setTab(t.id)}>
               <i className={"bi " + t.icon} style={{ marginRight: 5 }}></i>{t.label}
+              {t.tag && <span className="chip-tag">{t.tag}</span>}
             </button>
           ))}
         </div>
