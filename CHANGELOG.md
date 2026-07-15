@@ -9,6 +9,18 @@ Das Format orientiert sich an
 
 ## [Unreleased]
 
+### Added
+
+- **Schneller Chat (Beta): Markdown-Rendering der Antworten**: KI-Antworten
+  werden jetzt formatiert dargestellt statt als roher Markdown-Quelltext.
+  Überschriften (`##`/`###`), Fettschrift (`**text**`), Listen (`-`/`1.`),
+  Code-Blöcke, Zitate, Tabellen, Links und horizontale Linien (`---`) werden
+  gerendert. Zum Einsatz kommen `marked` (Parser) und `DOMPurify`
+  (HTML-Sanitizing mit Tag-/Attribut-Allowlist) als CDN-Bibliotheken mit
+  SRI-Hashes; Links öffnen in einem neuen Tab (`rel="noopener noreferrer"`).
+  Stehen die Bibliotheken nicht zur Verfügung, fällt die Anzeige auf reinen
+  Text zurück. (#23)
+
 ## [1.6.0] - 2026-07-14
 
 ### Added
