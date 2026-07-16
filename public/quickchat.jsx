@@ -14,6 +14,55 @@
 //      can follow which tickets the model is looking at while it works.
 // ============================================================
 
+// ---------- Markdown rendering ----------
+// Assistant answers arrive as Markdown (##-Überschriften, **fett**, Listen,
+// Code-Blöcke, …). marked turns them into HTML and DOMPurify sanitizes the
+// result before it is injected — model output is untrusted (it can echo HTML
+// from indexed tickets), so the sanitizer allowlist below is the security
+// boundary, not marked.
+const MD_SANITIZE_CONFIG = {
+  ALLOWED_TAGS: [
+    "p", "br", "strong", "b", "em", "i", "del", "s", "code", "pre",
+    "blockquote", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6",
+    "a", "hr", "table", "thead", "tbody", "tr", "th", "td",
+  ],
+  ALLOWED_ATTR: ["href", "title", "align", "start"],
+  ALLOWED_URI_REGEXP: /^(?:https?|mailto):/i,
+};
+
+// Links in answers must never navigate the dashboard away or gain access to
+// the opener window. Registered once, guarded so a re-evaluation of this file
+// (Babel in the browser) does not stack duplicate hooks.
+if (window.DOMPurify && !window.__qcPurifyHooked) {
+  window.__qcPurifyHooked = true;
+  window.DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.tagName === "A") {
+      node.setAttribute("target", "_blank");
+      node.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+}
+
+// Markdown -> sanitized HTML. Returns null when the CDN libraries are not
+// available or parsing fails, so callers can fall back to plain text.
+function renderMarkdownSafe(text) {
+  if (!window.marked || !window.DOMPurify) return null;
+  try {
+    const html = window.marked.parse(text, { gfm: true, breaks: true, async: false });
+    return window.DOMPurify.sanitize(html, MD_SANITIZE_CONFIG);
+  } catch (_e) {
+    return null;
+  }
+}
+
+// Rendered Markdown body of an assistant bubble (plain text as fallback).
+// Memoized because the content re-parses on every streaming flush.
+function MarkdownContent({ text }) {
+  const html = React.useMemo(() => renderMarkdownSafe(text), [text]);
+  if (html === null) return text;
+  return <div className="chat-md" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 // Pulls the reasoning ("<think>…</think>") out of a raw content string and
 // returns the visible answer separately. `open` is true while a think block has
 // been opened but not yet closed (i.e. the model is still reasoning).
@@ -384,7 +433,9 @@ function QuickChat() {
                 )}
                 {(m.content || waiting) && (
                   <div className="chat-bubble assistant">
-                    {m.content || <span className="typing-dots"><i></i><i></i><i></i></span>}
+                    {m.content
+                      ? <MarkdownContent text={m.content} />
+                      : <span className="typing-dots"><i></i><i></i><i></i></span>}
                   </div>
                 )}
                 <SourceChips sources={m.sources} />
