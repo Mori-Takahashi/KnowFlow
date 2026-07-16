@@ -35,6 +35,32 @@ function connFromResource(resource) {
 }
 
 /**
+ * Validates a redirect URI per OAuth 2.1 / RFC 9700: it must be an absolute
+ * `https` URI. Plain `http` is tolerated only for loopback hosts (localhost,
+ * 127.0.0.1, ::1) so local development still works. Every other scheme
+ * (`javascript:`, `data:`, `file:`, custom schemes, ...) is rejected. Parsing
+ * happens via `new URL()` rather than a regex for robustness.
+ *
+ * @param {*} uri -> Candidate redirect URI.
+ * @returns {boolean} -> True if the URI is an acceptable redirect target.
+ */
+function isValidRedirectUri(uri) {
+  if (typeof uri !== 'string' || !uri) return false;
+  let parsed;
+  try {
+    parsed = new URL(uri);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol === 'https:') return true;
+  if (parsed.protocol === 'http:') {
+    const host = parsed.hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
+  }
+  return false;
+}
+
+/**
  * Builds the OAuth 2.1 router that turns KnowFlow into an authorization server
  * + protected resource for its MCP endpoints, so OAuth-only MCP clients (e.g.
  * the Claude custom connector) can authenticate. The flow is stateless: codes
@@ -143,6 +169,13 @@ function createOAuthRouter({ config, authService }) {
       res.status(400).json({ error: 'invalid_redirect_uri', error_description: 'redirect_uris ist erforderlich.' });
       return;
     }
+    if (!redirectUris.every(isValidRedirectUri)) {
+      res.status(400).json({
+        error: 'invalid_redirect_uri',
+        error_description: 'redirect_uris müssen absolute https-URIs sein (http nur für localhost / 127.0.0.1).',
+      });
+      return;
+    }
     const clientId = oauthService.issueClientId(redirectUris);
     res.status(201).json({
       client_id: clientId,
@@ -220,6 +253,11 @@ function createOAuthRouter({ config, authService }) {
     }
     if (!p.redirect_uri || !client.ru.includes(p.redirect_uri)) {
       return { ok: false, status: 400, message: 'redirect_uri ist nicht für diesen Client registriert.' };
+    }
+    // Defence in depth: reject disallowed schemes again even for an already
+    // registered redirect_uri, in case something slipped into the DB.
+    if (!isValidRedirectUri(p.redirect_uri)) {
+      return { ok: false, status: 400, message: 'redirect_uri verwendet ein unzulässiges Schema (nur https bzw. http auf localhost / 127.0.0.1).' };
     }
     const conn = connFromResource(p.resource);
     if (!conn || !queries.getMcpConnection(conn)) {
