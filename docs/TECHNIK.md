@@ -21,6 +21,7 @@ Pipeline-Stand, Service-Health und einen Aktivitäts-Feed in Echtzeit.
 - [Voraussetzungen](#voraussetzungen)
 - [Schnellstart](#schnellstart)
 - [Konfiguration](#konfiguration)
+  - [Jira-Anmeldung: OAuth 2.0 (empfohlen)](#jira-anmeldung-oauth-20-empfohlen)
 - [Admin-Dashboard](#admin-dashboard)
 - [Updates & Versionsbanner](#updates--versionsbanner)
 - [Jira-Webhook einrichten](#jira-webhook-einrichten)
@@ -261,8 +262,8 @@ und exponiert Port `3000`. Ein Healthcheck pingt regelmäßig den HTTP-Root.
 | Variable                  | Beschreibung |
 |---------------------------|--------------|
 | `JIRA_BASE_URL`           | `https://<workspace>.atlassian.net` |
-| `JIRA_EMAIL`              | Atlassian-Account-E-Mail |
-| `JIRA_API_TOKEN`          | API-Token aus dem Atlassian-Profil |
+| `JIRA_EMAIL`              | Atlassian-Account-E-Mail (nur bei Anmeldung per API-Token) |
+| `JIRA_API_TOKEN`          | API-Token aus dem Atlassian-Profil (nur bei Anmeldung per API-Token) |
 | `JIRA_PROJECT_KEYS`       | Kommagetrennte Projekt-Keys (`KNOW,DOC,WIKI`) |
 | `JIRA_DONE_STATUS`        | Trigger-Status, kommagetrennt möglich (`Done,Erledigt,Fertig`) |
 | `JIRA_REWORK_STATUSES`    | Status für „Wird überarbeitet" (nur UI-Markierung) |
@@ -274,6 +275,29 @@ und exponiert Port `3000`. Ein Healthcheck pingt regelmäßig den HTTP-Root.
 > gelesen**. Änderungen erfolgen ausschließlich im Admin-Dashboard. Für ein
 > erneutes Seeding kann die SQLite-Datei gelöscht und der Server neu gestartet
 > werden.
+
+### Jira-Anmeldung: OAuth 2.0 (empfohlen)
+
+Statt eines API-Tokens kann sich KnowFlow per **OAuth 2.0 (3LO)** bei Jira Cloud
+anmelden. Dafür werden dauerhaft zwei Umgebungsvariablen benötigt:
+
+| Variable                   | Beschreibung |
+|----------------------------|--------------|
+| `JIRA_OAUTH_CLIENT_ID`     | Client-ID der Atlassian-OAuth-App |
+| `JIRA_OAUTH_CLIENT_SECRET` | Client-Secret der Atlassian-OAuth-App |
+
+Sind sie gesetzt, bieten der Setup-Assistent (Schritt „Jira-Verbindung") und der
+Admin-Tab **Allgemein** einen Button **Mit Jira anmelden** an. Access- und
+Refresh-Token werden verschlüsselt in SQLite abgelegt und automatisch erneuert;
+`JIRA_EMAIL`/`JIRA_API_TOKEN` werden dann nicht mehr benötigt. Die REST-Aufrufe laufen
+in diesem Modus über `https://api.atlassian.com/ex/jira/<cloudId>`.
+
+Endpunkte: `GET /api/jira/oauth/status`, `POST /api/jira/oauth/authorize`,
+`GET /api/jira/oauth/callback`, `POST /api/jira/oauth/disconnect`. Die Callback-URL
+`<PUBLIC_BASE_URL>/api/jira/oauth/callback` muss in der Atlassian Developer Console
+hinterlegt sein.
+
+**→ Schritt-für-Schritt-Anleitung: [Jira mit OAuth 2.0 verbinden](./JIRA_OAUTH.md)**
 
 ### Optionale Server-Einstellungen
 

@@ -16,6 +16,7 @@ const { openDatabase } = require('./db');
 const settingsService = require('./services/settingsService');
 const authService = require('./services/authService');
 const { createJiraService } = require('./services/jiraService');
+const jiraOAuthService = require('./services/jiraOAuthService');
 const { createOpenWebUiService } = require('./services/openwebuiService');
 const { createRoutingService } = require('./services/routingService');
 const { createAttachmentService } = require('./services/attachmentService');
@@ -31,6 +32,7 @@ const { createAdminRouter } = require('./routes/admin');
 const { createSetupRouter } = require('./routes/setup');
 const { createMcpRouter } = require('./routes/mcp');
 const { createOAuthRouter } = require('./routes/oauth');
+const { createJiraOAuthRouter } = require('./routes/jiraOauth');
 const { createDebugRouter } = require('./routes/debug');
 const { createOpenWebUiDummyRouter } = require('./routes/openwebuiDummy');
 const { maskSecret } = require('./utils/mask');
@@ -40,6 +42,22 @@ const { requireSession } = require('./middleware/auth');
 const { MCP_CONNECTION_SEEDS, OPENWEBUI_MODE } = require('./constants');
 
 const log = debug('knowflow:index');
+
+/**
+ * Describes the active Jira authentication for the boot summary.
+ *
+ * @param {Object} jira -> Jira config from the settings store.
+ * @returns {string} -> Human-readable auth line.
+ */
+function jiraAuthLine(jira) {
+  if (jira.authMethod === 'oauth') {
+    return `OAuth 2.0${jira.accountName ? ` (${jira.accountName})` : ''}`;
+  }
+  if (jira.authMethod === 'basic') return 'API-Token';
+  return jiraOAuthService.isConfigured()
+    ? 'nicht verbunden (OAuth einsatzbereit)'
+    : 'nicht verbunden';
+}
 
 /**
  * Prints a one-shot boot summary so the user can verify the effective config
@@ -62,6 +80,7 @@ function printBootSummary(config) {
     `Port: ${config.port}`,
     `Public Base URL: ${config.publicBaseUrl}`,
     `Jira Base URL: ${jira.baseUrl || '(nicht gesetzt)'}`,
+    `Jira Auth: ${jiraAuthLine(jira)}`,
     `Jira Project Keys: [${jira.projectKeys.join(', ')}]`,
     `Jira Done Statuses: [${jira.doneStatuses.join(', ')}]`,
     `Jira Rework Statuses: [${jira.reworkStatuses.join(', ')}]`,
@@ -200,6 +219,10 @@ async function main() {
   app.use(createOAuthRouter({ config, authService }));
 
   app.use('/webhook', createWebhookRouter({ workflowService, settingsService, versionService, config }));
+  
+  // Jira OAuth 2.0 Routes
+  app.use('/api/jira/oauth', createJiraOAuthRouter({ config, settingsService }));
+  
   app.use(
     '/api',
     createApiRouter({

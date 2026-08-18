@@ -53,6 +53,11 @@ cp .env.example .env
 docker compose up -d
 ```
 
+Im Setup-Schritt **Jira-Verbindung** kannst du dich per **OAuth 2.0** direkt bei Atlassian
+anmelden, statt ein API-Token zu pflegen — die einmalige Einrichtung dazu steht in
+[Jira mit OAuth 2.0 verbinden](docs/JIRA_OAUTH.md). Die Anmeldung per API-Token
+funktioniert unverändert weiter.
+
 Damit Jira echte Tickets schicken kann, brauchst du später noch einen Webhook —
 die Schritt-für-Schritt-Anleitung steht in der [technischen Dokumentation](docs/TECHNIK.md#jira-webhook-einrichten).
 
@@ -104,6 +109,7 @@ alles zur Laufzeit änderbar:
 |---|---|
 | [Was ist KnowFlow?](Was-ist-KnowFlow.md) | **Anwender:innen** — jeder Bereich der Oberfläche in Alltagssprache erklärt |
 | [Technische Dokumentation](docs/TECHNIK.md) | **Admins & Entwickler:innen** — Installation, Konfiguration, Jira-Webhook, API, Troubleshooting |
+| [Jira mit OAuth 2.0 verbinden](docs/JIRA_OAUTH.md) | **Admins** — Anmeldung bei Jira ohne API-Token einrichten |
 | [Changelog](CHANGELOG.md) | Was ist neu in welcher Version? |
 | [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) | Mitmachen & Sicherheitshinweise |
 

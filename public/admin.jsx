@@ -249,6 +249,56 @@ function AdminGeneral({ config, reloadConfig }) {
     }
   };
 
+  // Startet den Atlassian-Consent-Flow; der Callback kehrt auf diese Seite zurück.
+  const connectOAuth = async () => {
+    setMsg(null);
+    try {
+      const res = await fetch("/api/jira/oauth/authorize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": window.getCsrfToken ? window.getCsrfToken() : "",
+        },
+        body: JSON.stringify({ returnTo: "/admin" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+      window.location.href = data.authUrl;
+    } catch (err) {
+      setMsg({ kind: "err", text: err.message });
+    }
+  };
+
+  const disconnectOAuth = async () => {
+    setMsg(null);
+    try {
+      const res = await fetch("/api/jira/oauth/disconnect", {
+        method: "POST",
+        headers: { "x-csrf-token": window.getCsrfToken ? window.getCsrfToken() : "" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+      setMsg({ kind: "ok", text: "Jira-OAuth-Verbindung getrennt." });
+      reloadConfig();
+    } catch (err) {
+      setMsg({ kind: "err", text: err.message });
+    }
+  };
+
+  // Ergebnis des OAuth-Rücksprungs anzeigen und die Query wieder aufräumen.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("jiraOauth");
+    if (!result) return;
+    if (result === "success") {
+      setMsg({ kind: "ok", text: `Mit Jira verbunden${params.get("account") ? ` als ${params.get("account")}` : ""}.` });
+      reloadConfig();
+    } else {
+      setMsg({ kind: "err", text: params.get("message") || "Die Jira-Anmeldung ist fehlgeschlagen." });
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }, []);
+
   const setMode = async (mode) => {
     try {
       await adminApi("PUT", "/config/openwebui-mode", { mode });
@@ -267,24 +317,67 @@ function AdminGeneral({ config, reloadConfig }) {
         <div className="card-body-x">
           {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
           {testMsg && <Banner kind={testMsg.kind}>{testMsg.text}</Banner>}
-          <Field label="Base URL" value={baseUrl} onChange={setBaseUrl} placeholder="https://workspace.atlassian.net" />
-          <Field label="E-Mail" value={email} onChange={setEmail} placeholder="user@example.com" />
-          <Field
-            label={"API-Token" + (j.hasApiToken ? " (gesetzt — leer lassen, um beizubehalten)" : "")}
-            type="password"
-            value={apiToken}
-            onChange={setApiToken}
-            placeholder={j.hasApiToken ? "•••••••• gespeichert" : "Jira API-Token"}
-          />
-          <Field
-            label="Ablaufdatum des API-Tokens (optional)"
-            type="date"
-            value={apiTokenExpiresAt}
-            onChange={setApiTokenExpiresAt}
-          />
-          <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: -6, marginBottom: 12 }}>
-            10 Tage vor Ablauf erscheint eine Warnung im Dashboard. Leer lassen, um die Erinnerung zu deaktivieren.
+
+          <div className="jira-auth-box">
+            <div className="jira-auth-head">
+              <i className={"bi " + (j.authMethod === "oauth" ? "bi-shield-check" : "bi-key")}></i>
+              <span>
+                {j.authMethod === "oauth"
+                  ? `OAuth 2.0 aktiv${j.oauthAccountName ? ` · ${j.oauthAccountName}` : ""}`
+                  : j.authMethod === "basic"
+                    ? "Anmeldung per API-Token"
+                    : "Noch nicht verbunden"}
+              </span>
+            </div>
+            {j.authMethod === "oauth" ? (
+              <p className="jira-auth-desc">
+                Tokens werden automatisch erneuert. Die Felder für E-Mail und API-Token werden
+                nicht verwendet, solange OAuth aktiv ist.
+              </p>
+            ) : j.oauthAvailable ? (
+              <p className="jira-auth-desc">
+                Empfohlen: mit Atlassian anmelden statt ein API-Token zu pflegen.
+              </p>
+            ) : (
+              <p className="jira-auth-desc">
+                Für OAuth fehlen noch <code>JIRA_OAUTH_CLIENT_ID</code> und
+                <code> JIRA_OAUTH_CLIENT_SECRET</code> in der <code>.env</code> — Anleitung in
+                <code> docs/JIRA_OAUTH.md</code>.
+              </p>
+            )}
+            {j.authMethod === "oauth" ? (
+              <button className="btn-ghost" onClick={disconnectOAuth} disabled={!canEdit}>
+                <i className="bi bi-plug"></i>Verbindung trennen
+              </button>
+            ) : (
+              <button className="btn-primary-x" onClick={connectOAuth} disabled={!canEdit || !j.oauthAvailable}>
+                <i className="bi bi-box-arrow-in-right"></i>Mit Jira anmelden
+              </button>
+            )}
           </div>
+
+          <Field label="Base URL" value={baseUrl} onChange={setBaseUrl} placeholder="https://workspace.atlassian.net" />
+          {j.authMethod !== "oauth" && (
+            <>
+              <Field label="E-Mail" value={email} onChange={setEmail} placeholder="user@example.com" />
+              <Field
+                label={"API-Token" + (j.hasApiToken ? " (gesetzt — leer lassen, um beizubehalten)" : "")}
+                type="password"
+                value={apiToken}
+                onChange={setApiToken}
+                placeholder={j.hasApiToken ? "•••••••• gespeichert" : "Jira API-Token"}
+              />
+              <Field
+                label="Ablaufdatum des API-Tokens (optional)"
+                type="date"
+                value={apiTokenExpiresAt}
+                onChange={setApiTokenExpiresAt}
+              />
+              <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: -6, marginBottom: 12 }}>
+                10 Tage vor Ablauf erscheint eine Warnung im Dashboard. Leer lassen, um die Erinnerung zu deaktivieren.
+              </div>
+            </>
+          )}
           <Field label="Projekt-Schlüssel (kommagetrennt)" value={projectKeys} onChange={setProjectKeys} placeholder="KAN, KNOW" />
           <Field label="Done-Status (kommagetrennt)" value={doneStatuses} onChange={setDoneStatuses} placeholder="Done, Fertig" />
           <Field label="Überarbeiten-Status (kommagetrennt)" value={reworkStatuses} onChange={setReworkStatuses} placeholder="Überarbeiten" />

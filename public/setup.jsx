@@ -115,6 +115,10 @@ function SetupWizard({ onComplete }) {
 
   // Schritt 3: Jira (optional)
   const [jiraSkipped, setJiraSkipped] = React.useState(false);
+  const [jiraAuthMethod, setJiraAuthMethod] = React.useState("oauth"); // 'oauth' oder 'basic'
+  const [jiraOAuthAvailable, setJiraOAuthAvailable] = React.useState(false);
+  const [jiraOAuthConnected, setJiraOAuthConnected] = React.useState(false);
+  const [jiraOAuthAccount, setJiraOAuthAccount] = React.useState("");
   const [baseUrl, setBaseUrl] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [apiToken, setApiToken] = React.useState("");
@@ -154,6 +158,42 @@ function SetupWizard({ onComplete }) {
       })
       .catch(() => {});
   }, []);
+  
+  // Ist Jira OAuth serverseitig überhaupt eingerichtet (Client-ID/Secret)?
+  React.useEffect(() => {
+    fetch("/api/jira/oauth/status")
+      .then((r) => r.json())
+      .then((d) => {
+        setJiraOAuthAvailable(Boolean(d && d.available));
+        if (!d || !d.available) setJiraAuthMethod("basic");
+        if (d && d.connected) {
+          setJiraOAuthConnected(true);
+          setJiraOAuthAccount(d.accountName || d.siteUrl || "");
+          if (d.siteUrl) setBaseUrl(d.siteUrl);
+        }
+      })
+      .catch(() => setJiraOAuthAvailable(false));
+  }, []);
+
+  // Ergebnis des OAuth-Rücksprungs auswerten; der Wizard startet danach neu,
+  // deshalb wird direkt in den Jira-Schritt gesprungen.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("jiraOauth");
+    if (!result) return;
+
+    if (result === "success") {
+      setJiraOAuthConnected(true);
+      setJiraOAuthAccount(params.get("account") || params.get("site") || "");
+      if (params.get("site")) setBaseUrl(params.get("site"));
+    } else {
+      setError(params.get("message") || "Die Jira-Anmeldung ist fehlgeschlagen.");
+    }
+    setJiraAuthMethod("oauth");
+    setStep(STEP_JIRA);
+    setPinOk(true);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }, []);
 
   // PIN-Validierung: genau 6 Ziffern.
   const pinValid = /^[0-9]{6}$/.test(pin);
@@ -163,8 +203,8 @@ function SetupWizard({ onComplete }) {
   const passwordsMatch = password === passwordRepeat;
   const passwordValid = passwordLongEnough && passwordsMatch && passwordRepeat.length >= 6;
 
-  // Hat der Nutzer in Schritt 3 tatsächlich Jira-Werte hinterlegt?
-  const jiraHasValues = Boolean(baseUrl.trim());
+  // Hat der Nutzer in Schritt 3 tatsächlich Jira konfiguriert (OAuth oder API-Token)?
+  const jiraHasValues = Boolean(jiraOAuthConnected || baseUrl.trim());
   // Hat der Nutzer in Schritt 4 echte Wissensbasis-Felder befüllt?
   const targetHasValues = Boolean(targetUrl.trim() || knowledgeId.trim() || targetToken.trim());
 
@@ -207,6 +247,50 @@ function SetupWizard({ onComplete }) {
     setStep((s) => s + 1);
   };
 
+  // Startet den Jira-OAuth-Flow: der Server liefert die Atlassian-Consent-URL.
+  const startJiraOAuth = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/jira/oauth/authorize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": window.getCsrfToken ? window.getCsrfToken() : "",
+        },
+        body: JSON.stringify({ returnTo: "/" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+      window.location.href = data.authUrl;
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
+  // Trennt die bestehende OAuth-Verbindung, damit ein anderes Konto gewählt werden kann.
+  const disconnectJiraOAuth = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/jira/oauth/disconnect", {
+        method: "POST",
+        headers: { "x-csrf-token": window.getCsrfToken ? window.getCsrfToken() : "" },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "HTTP " + res.status);
+      }
+      setJiraOAuthConnected(false);
+      setJiraOAuthAccount("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Überspringen merkt sich das Flag pro Schritt und springt weiter.
   const skipStep = () => {
     setError(null);
@@ -224,17 +308,24 @@ function SetupWizard({ onComplete }) {
     try {
       const payload = { password, openwebuiMode: owMode };
 
-      // Jira nur senden, wenn nicht übersprungen UND eine Base-URL vorhanden ist.
-      if (!jiraSkipped && jiraHasValues) {
+      // Jira nur senden, wenn nicht übersprungen UND mindestens Base-URL oder OAuth vorhanden ist.
+      // OAuth überträgt nicht email/apiToken, sondern wird über OAuth-Flow bereits gespeichert.
+      const jiraConfigured = jiraOAuthConnected || baseUrl.trim();
+      if (!jiraSkipped && jiraConfigured) {
         payload.jira = {
-          baseUrl,
-          email,
-          apiToken,
           projectKeys: setupTextToList(projectKeys),
           doneStatuses: setupTextToList(doneStatuses),
           reworkStatuses: setupTextToList(reworkStatuses),
           webhookSecret,
         };
+
+        // Bei OAuth hat der Callback die Base-URL schon gesetzt; leeres Feld darf sie nicht überschreiben.
+        if (baseUrl.trim()) payload.jira.baseUrl = baseUrl.trim();
+
+        if (jiraAuthMethod === "basic" && email && apiToken) {
+          payload.jira.email = email;
+          payload.jira.apiToken = apiToken;
+        }
       }
 
       // Wissensbasis nur senden, wenn nicht übersprungen UND mindestens ein Feld
@@ -364,21 +455,116 @@ function SetupWizard({ onComplete }) {
           Verbinde dein Jira Cloud-Projekt. Du kannst diesen Schritt überspringen
           und später im Admin-Bereich nachholen.
         </p>
-        <SetupField
-          label="Base URL"
-          value={baseUrl}
-          onChange={setBaseUrl}
-          placeholder="https://workspace.atlassian.net"
-          autoFocus
-        />
-        <SetupField label="E-Mail" value={email} onChange={setEmail} placeholder="name@beispiel.de" />
-        <SetupField
-          label="API-Token"
-          type="password"
-          value={apiToken}
-          onChange={setApiToken}
-          placeholder="Jira API-Token"
-        />
+        
+        {!jiraOAuthConnected && (
+          <>
+            {error && <SetupErrorBanner>{error}</SetupErrorBanner>}
+            
+            <div className="setup-auth-method">
+              <button
+                type="button"
+                className={"setup-choice" + (jiraAuthMethod === "oauth" ? " active" : "")}
+                onClick={() => { setJiraAuthMethod("oauth"); setError(null); }}
+              >
+                <div className="setup-choice-head">
+                  <i className="bi bi-shield-check"></i>
+                  <span>OAuth 2.0</span>
+                  {jiraAuthMethod === "oauth" && <i className="bi bi-check-circle-fill setup-choice-check"></i>}
+                </div>
+                <div className="setup-choice-desc">
+                  Empfohlen. Anmeldung direkt bei Atlassian — kein API-Token nötig, Tokens
+                  werden automatisch erneuert.
+                </div>
+              </button>
+              <button
+                type="button"
+                className={"setup-choice" + (jiraAuthMethod === "basic" ? " active" : "")}
+                onClick={() => { setJiraAuthMethod("basic"); setError(null); }}
+              >
+                <div className="setup-choice-head">
+                  <i className="bi bi-key"></i>
+                  <span>API-Token</span>
+                  {jiraAuthMethod === "basic" && <i className="bi bi-check-circle-fill setup-choice-check"></i>}
+                </div>
+                <div className="setup-choice-desc">
+                  Klassische Anmeldung mit E-Mail und API-Token. Das Token läuft ab und muss
+                  erneuert werden.
+                </div>
+              </button>
+            </div>
+
+            <div className="setup-divider"></div>
+
+            {jiraAuthMethod === "oauth" ? (
+              <>
+                {jiraOAuthAvailable ? (
+                  <>
+                    <p className="setup-info">
+                      Du wirst zu Atlassian weitergeleitet und meldest dich dort mit deinem
+                      Jira-Konto an. Danach geht es hier automatisch weiter.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn-primary-x"
+                      disabled={busy}
+                      onClick={startJiraOAuth}
+                      style={{ width: "100%" }}
+                    >
+                      {busy && <Spinner />}
+                      <i className="bi bi-box-arrow-in-right"></i>
+                      Mit Jira anmelden
+                    </button>
+                  </>
+                ) : (
+                  <p className="setup-info">
+                    OAuth ist auf diesem Server noch nicht eingerichtet. Dafür werden einmalig
+                    <code> JIRA_OAUTH_CLIENT_ID</code> und <code>JIRA_OAUTH_CLIENT_SECRET</code> in
+                    der <code>.env</code> benötigt — die Anleitung dazu steht in
+                    <code> docs/JIRA_OAUTH.md</code>. Bis dahin kannst du die Anmeldung per
+                    API-Token verwenden.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <SetupField
+                  label="Base URL"
+                  value={baseUrl}
+                  onChange={setBaseUrl}
+                  placeholder="https://workspace.atlassian.net"
+                  autoFocus
+                />
+                <SetupField label="E-Mail" value={email} onChange={setEmail} placeholder="name@beispiel.de" />
+                <SetupField
+                  label="API-Token"
+                  type="password"
+                  value={apiToken}
+                  onChange={setApiToken}
+                  placeholder="Jira API-Token"
+                />
+              </>
+            )}
+          </>
+        )}
+        
+        {jiraOAuthConnected && (
+          <div className="setup-oauth-success">
+            <div className="setup-oauth-check">
+              <i className="bi bi-check-circle-fill"></i>
+            </div>
+            <p className="setup-oauth-text">
+              Mit Jira verbunden als<br />
+              <strong>{jiraOAuthAccount}</strong>
+            </p>
+            <button type="button" className="btn-ghost" onClick={disconnectJiraOAuth} disabled={busy}>
+              <i className="bi bi-arrow-counterclockwise"></i>
+              Anderes Konto verwenden
+            </button>
+          </div>
+        )}
+        
+        <div className="setup-divider"></div>
+        
         <SetupField
           label="Projekt-Schlüssel"
           value={projectKeys}
@@ -543,7 +729,13 @@ function SetupWizard({ onComplete }) {
           <div className="setup-summary-row">
             <i className={"bi " + (jiraOn ? "bi-check-circle-fill setup-sum-ok" : "bi-dash-circle setup-sum-skip")}></i>
             <span className="setup-sum-label">Jira</span>
-            <span className="setup-sum-val">{jiraOn ? baseUrl : "übersprungen"}</span>
+            <span className="setup-sum-val">
+              {!jiraOn
+                ? "übersprungen"
+                : jiraOAuthConnected
+                  ? `OAuth · ${jiraOAuthAccount}`
+                  : baseUrl}
+            </span>
           </div>
           <div className="setup-summary-row">
             <i className="bi bi-check-circle-fill setup-sum-ok"></i>

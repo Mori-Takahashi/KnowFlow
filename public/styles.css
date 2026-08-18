@@ -1296,6 +1296,47 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   line-height: 1.45;
 }
 
+/* OAuth Authentication Methods */
+.setup-auth-method { display: flex; flex-direction: column; gap: 10px; margin-bottom: 1rem; }
+.setup-auth-method .setup-choice { width: 100%; }
+
+.setup-info {
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--bg-2);
+  border-left: 3px solid var(--brand);
+  padding: 10px 12px;
+  margin-bottom: 1rem;
+}
+
+.setup-oauth-success {
+  text-align: center;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.setup-oauth-check .bi { font-size: 28px; color: var(--ok); }
+.setup-oauth-text { font-size: 13px; margin: 8px 0 14px; }
+
+/* Admin: Statuskarte der Jira-Authentifizierung */
+.jira-auth-box {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.jira-auth-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.jira-auth-head .bi { color: var(--brand); }
+.jira-auth-desc { font-size: 12px; color: var(--muted); margin: 6px 0 12px; line-height: 1.5; }
+
 .setup-divider { height: 1px; background: var(--border); margin: 16px 0; }
 
 /* Zusammenfassung */

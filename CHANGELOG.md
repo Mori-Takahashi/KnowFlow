@@ -9,8 +9,19 @@ Das Format orientiert sich an
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-08-18
+
 ### Added
 
+- **Jira-Anmeldung per OAuth 2.0**: KnowFlow kann sich jetzt über den
+  Atlassian-3LO-Flow bei Jira Cloud anmelden — ein API-Token ist damit nicht mehr
+  nötig. Sind `JIRA_OAUTH_CLIENT_ID` und `JIRA_OAUTH_CLIENT_SECRET` gesetzt, bieten
+  der Setup-Assistent (Schritt „Jira-Verbindung") und der Admin-Tab „Allgemein"
+  einen Button **Mit Jira anmelden** samt Statusanzeige und **Verbindung trennen**.
+  Access- und Refresh-Token werden verschlüsselt gespeichert und vor Ablauf
+  automatisch erneuert; die REST-Aufrufe laufen dann über
+  `api.atlassian.com/ex/jira/<cloudId>`. Die Anmeldung per E-Mail und API-Token
+  bleibt unverändert möglich. Einrichtung: [docs/JIRA_OAUTH.md](docs/JIRA_OAUTH.md).
 - **Schneller Chat (Beta): Markdown-Rendering der Antworten**: KI-Antworten
   werden jetzt formatiert dargestellt statt als roher Markdown-Quelltext.
   Überschriften (`##`/`###`), Fettschrift (`**text**`), Listen (`-`/`1.`),

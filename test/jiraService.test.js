@@ -36,6 +36,7 @@ const settingsStub = {
     baseUrl: 'https://example.atlassian.net',
     email: 'a@b.c',
     apiToken: 'token',
+    authMethod: 'basic',
   }),
 };
 

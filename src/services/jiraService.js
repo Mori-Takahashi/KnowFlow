@@ -3,6 +3,7 @@
 const axios = require('axios');
 const debug = require('debug');
 
+const jiraOAuthService = require('./jiraOAuthService');
 const {
   HTTP_TIMEOUT_MS,
   COMMENT_TEMPLATES,
@@ -10,6 +11,10 @@ const {
 } = require('../constants');
 
 const log = debug('knowflow:jiraService');
+
+// OAuth 3LO calls do not go to the site host but through the Atlassian API
+// gateway, addressed by the site's cloud id.
+const OAUTH_API_BASE = 'https://api.atlassian.com/ex/jira';
 
 /**
  * Builds the Basic-Auth header value from email + API token.
@@ -24,25 +29,37 @@ function buildAuthHeader(email, token) {
 }
 
 /**
- * Creates an axios client preconfigured for the Jira Cloud REST API.
+ * Creates an axios client preconfigured for the Jira Cloud REST API, using either
+ * an OAuth bearer token (routed through the Atlassian API gateway) or the legacy
+ * email + API-token Basic auth against the site host.
  *
- * @param {Object} jiraConfig -> Jira section of the app config.
- * @param {string} jiraConfig.baseUrl -> Jira workspace base URL.
- * @param {string} jiraConfig.email -> Atlassian account email.
- * @param {string} jiraConfig.apiToken -> Atlassian API token.
+ * @param {Object} jiraConfig -> Jira config from the settings store.
+ * @param {string} [accessToken] -> A valid OAuth access token (OAuth mode only).
  * @returns {import('axios').AxiosInstance} -> Configured axios instance.
+ * @throws {Error} -> If the configuration is incomplete for the active method.
  */
-function createClient(jiraConfig) {
-  log('createClient called with: %o', { baseUrl: jiraConfig.baseUrl });
-  return axios.create({
-    baseURL: jiraConfig.baseUrl,
-    timeout: HTTP_TIMEOUT_MS,
-    headers: {
-      Authorization: buildAuthHeader(jiraConfig.email, jiraConfig.apiToken),
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-  });
+function createClient(jiraConfig, accessToken) {
+  log('createClient called with: %o', { authMethod: jiraConfig.authMethod });
+
+  const headers = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
+  let baseURL;
+
+  if (jiraConfig.authMethod === 'oauth') {
+    if (!accessToken) throw new Error('Jira-OAuth-Verbindung ohne gültiges Access-Token.');
+    if (!jiraConfig.cloudId) throw new Error('Jira-OAuth-Verbindung ohne Cloud-ID. Bitte Jira erneut verbinden.');
+    headers.Authorization = `Bearer ${accessToken}`;
+    baseURL = `${OAUTH_API_BASE}/${jiraConfig.cloudId}`;
+  } else if (jiraConfig.authMethod === 'basic') {
+    headers.Authorization = buildAuthHeader(jiraConfig.email, jiraConfig.apiToken);
+    baseURL = jiraConfig.baseUrl;
+  } else {
+    throw new Error('Jira ist nicht konfiguriert. Bitte im Admin-Bereich OAuth verbinden oder ein API-Token hinterlegen.');
+  }
+
+  return axios.create({ baseURL, timeout: HTTP_TIMEOUT_MS, headers });
 }
 
 /**
@@ -61,15 +78,28 @@ function createJiraService(settingsService) {
 
   /**
    * Returns an axios client for the current Jira configuration, rebuilding it
-   * when the credentials (baseUrl/email/token) have changed.
+   * whenever the credentials change. In OAuth mode the access token is refreshed
+   * first when it is expired or about to expire, hence the async signature.
    *
-   * @returns {import('axios').AxiosInstance} -> Configured client.
+   * @returns {Promise<import('axios').AxiosInstance>} -> Configured client.
+   * @throws {Error} -> If Jira is unconfigured or the token refresh fails.
    */
-  function getClient() {
+  async function getClient() {
     const cfg = settingsService.getJiraConfig();
-    const signature = `${cfg.baseUrl}|${cfg.email}|${cfg.apiToken}`;
+
+    let accessToken = '';
+    let signature;
+    if (cfg.authMethod === 'oauth') {
+      accessToken = await jiraOAuthService.getValidAccessToken(settingsService);
+      signature = `oauth|${cfg.cloudId}|${accessToken}`;
+    } else if (cfg.authMethod === 'basic') {
+      signature = `basic|${cfg.baseUrl}|${cfg.email}|${cfg.apiToken}`;
+    } else {
+      signature = 'none';
+    }
+
     if (!cachedClient || signature !== cachedSignature) {
-      cachedClient = createClient(cfg);
+      cachedClient = createClient(cfg, accessToken);
       cachedSignature = signature;
     }
     return cachedClient;
@@ -85,7 +115,8 @@ function createJiraService(settingsService) {
   async function getIssue(issueKey) {
     log('getIssue called with: %o', { issueKey });
     try {
-      const resp = await getClient().get(`/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+      const client = await getClient();
+      const resp = await client.get(`/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
         params: { expand: 'renderedFields,changelog' },
       });
       return resp.data;
@@ -105,7 +136,8 @@ function createJiraService(settingsService) {
   async function listFields() {
     log('listFields called');
     try {
-      const resp = await getClient().get('/rest/api/3/field');
+      const client = await getClient();
+      const resp = await client.get('/rest/api/3/field');
       const fields = Array.isArray(resp.data) ? resp.data : [];
       return fields.map((f) => ({
         id: f.id,
@@ -184,7 +216,8 @@ function createJiraService(settingsService) {
     log('addCommentWithMention called with: %o', { issueKey, accountId });
     const body = { body: buildAdfBody(accountId, message, link.label, link.url) };
     try {
-      const resp = await getClient().post(
+      const client = await getClient();
+      const resp = await client.post(
         `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`,
         body,
       );
@@ -266,7 +299,8 @@ function createJiraService(settingsService) {
     const correction = details?.correction ? truncateError(details.correction) : '';
     const body = { body: buildInaccuracyAdf(accountId, whatIsWrong, correction, link) };
     try {
-      const resp = await getClient().post(
+      const client = await getClient();
+      const resp = await client.post(
         `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`,
         body,
       );
@@ -288,7 +322,8 @@ function createJiraService(settingsService) {
   async function getIssueTransitions(issueKey) {
     log('getIssueTransitions called with: %o', { issueKey });
     try {
-      const resp = await getClient().get(
+      const client = await getClient();
+      const resp = await client.get(
         `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`,
       );
       return Array.isArray(resp.data?.transitions) ? resp.data.transitions : [];
@@ -309,7 +344,8 @@ function createJiraService(settingsService) {
   async function transitionIssue(issueKey, transitionId) {
     log('transitionIssue called with: %o', { issueKey, transitionId });
     try {
-      await getClient().post(`/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`, {
+      const client = await getClient();
+      await client.post(`/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`, {
         transition: { id: String(transitionId) },
       });
     } catch (err) {
@@ -412,10 +448,9 @@ function createJiraService(settingsService) {
   }
 
   /**
-   * Downloads the binary content of a Jira attachment. The content URL is the
-   * absolute URL Jira provides on the attachment object; it lives on the same
-   * host as the configured base URL, so the axios instance's Basic-Auth header
-   * still applies.
+   * Downloads the binary content of a Jira attachment. Jira hands out an absolute
+   * URL on the site host; in OAuth mode that host does not accept bearer tokens,
+   * so the URL is reduced to its REST path and sent through the API gateway.
    *
    * @param {string} contentUrl -> Absolute attachment content URL.
    * @param {number} [maxBytes] -> Optional upper bound for the response/body size.
@@ -430,7 +465,14 @@ function createJiraService(settingsService) {
         options.maxContentLength = maxBytes;
         options.maxBodyLength = maxBytes;
       }
-      const resp = await getClient().get(contentUrl, options);
+      const cfg = settingsService.getJiraConfig();
+      let url = contentUrl;
+      if (cfg.authMethod === 'oauth') {
+        const parsed = new URL(contentUrl);
+        url = `${parsed.pathname}${parsed.search}`;
+      }
+      const client = await getClient();
+      const resp = await client.get(url, options);
       return Buffer.from(resp.data);
     } catch (err) {
       console.error('[jiraService] downloadAttachment failed:', err.message);
@@ -448,11 +490,12 @@ function createJiraService(settingsService) {
     const start = Date.now();
     // Short-circuit with a clear status when Jira is not configured yet, instead
     // of letting axios throw a cryptic "Invalid URL" on an empty base URL.
-    if (!settingsService.getJiraConfig().baseUrl) {
+    if (settingsService.getJiraConfig().authMethod === 'none') {
       return { status: 'down', latencyMs: 0, statusLabel: 'Nicht konfiguriert' };
     }
     try {
-      await getClient().get('/rest/api/3/myself');
+      const client = await getClient();
+      await client.get('/rest/api/3/myself');
       const latencyMs = Date.now() - start;
       const status = latencyMs > 500 ? 'warn' : 'up';
       const statusLabel = status === 'warn' ? 'Erhöhte Latenz' : 'Verbunden';

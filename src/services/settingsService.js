@@ -139,12 +139,25 @@ function getVersion() {
  * Returns the Jira configuration with secrets decrypted, ready for the service
  * layer. Never send this to the browser unmasked.
  *
- * @returns {Object} -> { baseUrl, email, apiToken, projectKeys, doneStatuses, reworkStatuses, webhookSecret }
+ * Two authentication methods are supported: OAuth 2.0 (3LO, preferred) and the
+ * legacy email + API-token Basic auth. `authMethod` reports which one is active;
+ * OAuth wins when both are present.
+ *
+ * @returns {Object} -> Jira config including OAuth tokens, legacy credentials and project settings.
  */
 function getJiraConfig() {
   const raw = readJson(KEY.JIRA, {});
+  const hasOAuth = Boolean(raw.accessToken && raw.cloudId);
+  const hasBasicAuth = Boolean(raw.apiToken && raw.email);
+
   return {
     baseUrl: normalizeBaseUrl(raw.baseUrl),
+    accessToken: raw.accessToken ? decrypt(raw.accessToken) : '',
+    refreshToken: raw.refreshToken ? decrypt(raw.refreshToken) : '',
+    expiresAt: typeof raw.expiresAt === 'number' ? raw.expiresAt : 0,
+    cloudId: raw.cloudId || '',
+    accountId: raw.accountId || '',
+    accountName: raw.accountName || '',
     email: raw.email || '',
     apiToken: raw.apiToken ? decrypt(raw.apiToken) : '',
     projectKeys: Array.isArray(raw.projectKeys) ? raw.projectKeys : [],
@@ -152,6 +165,7 @@ function getJiraConfig() {
     reworkStatuses: Array.isArray(raw.reworkStatuses) ? raw.reworkStatuses : [],
     webhookSecret: raw.webhookSecret ? decrypt(raw.webhookSecret) : '',
     apiTokenExpiresAt: typeof raw.apiTokenExpiresAt === 'string' ? raw.apiTokenExpiresAt : '',
+    authMethod: hasOAuth ? 'oauth' : (hasBasicAuth ? 'basic' : 'none'),
   };
 }
 
@@ -167,6 +181,7 @@ function setJiraConfig(input) {
   log('setJiraConfig called');
   const current = readJson(KEY.JIRA, {});
   const next = {
+    ...current,
     baseUrl: input.baseUrl != null ? normalizeBaseUrl(input.baseUrl) : current.baseUrl || '',
     email: input.email != null ? input.email : current.email || '',
     apiToken: current.apiToken || '',
@@ -182,6 +197,77 @@ function setJiraConfig(input) {
   // so the operator can clear the reminder by emptying the field.
   if (input.apiTokenExpiresAt != null) next.apiTokenExpiresAt = String(input.apiTokenExpiresAt).trim();
   writeJson(KEY.JIRA, next);
+}
+
+/**
+ * Persists a completed Jira OAuth connection. The Jira Cloud id is what the REST
+ * calls are routed through, so it is stored alongside the tokens; the site URL is
+ * kept as baseUrl for links and display.
+ *
+ * @param {Object} input -> Connection data from the OAuth callback.
+ * @param {string} input.accessToken -> OAuth access token.
+ * @param {string} input.refreshToken -> OAuth refresh token (from `offline_access`).
+ * @param {number} input.expiresAt -> Access-token expiry (epoch ms).
+ * @param {string} input.cloudId -> Jira Cloud id of the authorized site.
+ * @param {string} input.siteUrl -> Jira Cloud site URL.
+ * @param {string} [input.accountId] -> Atlassian account id.
+ * @param {string} [input.accountName] -> Display name for the connected account.
+ * @returns {void}
+ */
+function setJiraOAuthConnection(input) {
+  log('setJiraOAuthConnection called');
+  const current = readJson(KEY.JIRA, {});
+  writeJson(KEY.JIRA, {
+    ...current,
+    baseUrl: normalizeBaseUrl(input.siteUrl || current.baseUrl || ''),
+    accessToken: encrypt(input.accessToken),
+    refreshToken: input.refreshToken ? encrypt(input.refreshToken) : '',
+    expiresAt: input.expiresAt || 0,
+    cloudId: input.cloudId || '',
+    accountId: input.accountId || '',
+    accountName: input.accountName || '',
+  });
+}
+
+/**
+ * Updates only the OAuth token triplet after a refresh, leaving the connected
+ * site and account untouched.
+ *
+ * @param {Object} input -> Refreshed tokens.
+ * @param {string} input.accessToken -> New access token.
+ * @param {string} input.refreshToken -> Current (possibly rotated) refresh token.
+ * @param {number} input.expiresAt -> New expiry (epoch ms).
+ * @returns {void}
+ */
+function setJiraOAuthTokens(input) {
+  log('setJiraOAuthTokens called');
+  const current = readJson(KEY.JIRA, {});
+  writeJson(KEY.JIRA, {
+    ...current,
+    accessToken: encrypt(input.accessToken),
+    refreshToken: input.refreshToken ? encrypt(input.refreshToken) : '',
+    expiresAt: input.expiresAt || 0,
+  });
+}
+
+/**
+ * Drops the Jira OAuth connection. Legacy Basic-auth credentials and all project
+ * settings are kept so the operator can fall back without re-entering them.
+ *
+ * @returns {void}
+ */
+function clearJiraOAuth() {
+  log('clearJiraOAuth called');
+  const current = readJson(KEY.JIRA, {});
+  writeJson(KEY.JIRA, {
+    ...current,
+    accessToken: '',
+    refreshToken: '',
+    expiresAt: 0,
+    cloudId: '',
+    accountId: '',
+    accountName: '',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1115,6 +1201,9 @@ module.exports = {
   getVersion,
   getJiraConfig,
   setJiraConfig,
+  setJiraOAuthConnection,
+  setJiraOAuthTokens,
+  clearJiraOAuth,
   getUpdateCheckConfig,
   setUpdateCheckConfig,
   getTokenExpiryReminders,

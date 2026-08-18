@@ -9,6 +9,7 @@ const { maskSecret } = require('../utils/mask');
 const queries = require('../db/queries');
 const socketService = require('../services/socketService');
 const embeddingService = require('../services/embeddingService');
+const jiraOAuthService = require('../services/jiraOAuthService');
 const { LOGICAL_FIELDS, ROUTING_OPERATORS, ACTIVITY_KIND, SESSION_ROLES } = require('../constants');
 
 const log = debug('knowflow:routes:admin');
@@ -169,6 +170,9 @@ function createAdminRouter({ jiraService, openwebuiService, routingService, sett
         hasWebhookSecret: Boolean(jira.webhookSecret),
         webhookSecretMasked: jira.webhookSecret ? maskSecret(jira.webhookSecret) : '',
         apiTokenExpiresAt: jira.apiTokenExpiresAt,
+        authMethod: jira.authMethod,
+        oauthAvailable: jiraOAuthService.isConfigured(),
+        oauthAccountName: jira.accountName,
       },
       openwebuiMode: settingsService.getOpenWebUiMode(),
       rag: (() => {
