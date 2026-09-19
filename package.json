@@ -29,7 +29,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@huggingface/transformers": "^4.2.0",
+    "@huggingface/transformers": "^4.3.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "axios": "^1.19.0",
     "better-sqlite3": "^13.0.3",
