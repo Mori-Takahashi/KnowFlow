@@ -21,6 +21,15 @@ Das Format orientiert sich an
   Stehen die Bibliotheken nicht zur Verfügung, fällt die Anzeige auf reinen
   Text zurück. (#23)
 
+### Security
+
+- **Abhängigkeiten aktualisiert (Dependabot-Alerts)**: Alle offenen
+  `npm audit`-Befunde (5 high, 4 moderate) behoben – `@huggingface/transformers`
+  4.3.0 (inkl. `onnxruntime-node` 1.30.0, `sharp` 0.35.5, `adm-zip` 0.6.1),
+  `fast-uri` 3.1.8, `hono` 4.13.11, `ip-address` 10.7.2, `protobufjs` 7.6.6 und
+  `qs` 6.16.0. Zusätzlich Minor-/Patch-Updates für `@modelcontextprotocol/sdk`,
+  `axios`, `express-rate-limit`, `socket.io`, `uuid` und `zod`.
+
 ## [1.6.0] - 2026-07-14
 
 ### Added
